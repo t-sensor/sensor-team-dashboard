@@ -4,6 +4,7 @@ import json
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
+import urllib.parse # 👈 เพิ่มบรรทัดนี้เพื่อใช้แปลงอักษรพิเศษใน URL
 
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team Dashboard", page_icon="⚙️", layout="wide")
@@ -12,11 +13,15 @@ st.set_page_config(page_title="Sensor Team Dashboard", page_icon="⚙️", layou
 GAS_URL = st.secrets["GAS_URL"]
 SHEET_URL = st.secrets["SHEET_URL"]
 
-# 🌟 --- ฟังก์ชันส่วนกลาง (ต้องอยู่ด้านบนตรงนี้ เพื่อให้ทุกเมนูเรียกใช้ได้) --- 🌟
+# 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
 @st.cache_data(ttl=60)
 def load_sheet(sheet_name):
     sheet_id = SHEET_URL.split("/d/")[1].split("/")[0]
-    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_name}"
+
+    # 💡 แปลงตัวอักษรพิเศษ (เว้นวรรค และ &) ให้เป็นรูปแบบที่ URL อ่านได้
+    encoded_sheet_name = urllib.parse.quote(sheet_name)
+
+    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}"
     return pd.read_csv(csv_url)
 
 # --- 3. สร้างระบบเมนูแถบด้านข้าง (Sidebar) ---
