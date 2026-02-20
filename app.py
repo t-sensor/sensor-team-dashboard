@@ -61,10 +61,17 @@ if 'logged_in' not in st.session_state:
     st.session_state['role'] = ''
 
 # 2. เช็คว่าเบราว์เซอร์เคยจำรหัสผ่านไว้ไหม (ถ้าเคย ให้ข้ามหน้า Login ไปเลย!)
-if localS.getItem("logged_in") == "true":
-    st.session_state['logged_in'] = True
-    st.session_state['username'] = localS.getItem("username")
-    st.session_state['role'] = localS.getItem("role")
+# ✅ แก้เป็นแบบนี้
+raw = localS.getItem("auth")
+if raw:
+    try:
+        auth_data = json.loads(raw)
+        if auth_data.get("logged_in") == "true":
+            st.session_state['logged_in'] = True
+            st.session_state['username'] = auth_data.get("username", "")
+            st.session_state['role'] = auth_data.get("role", "")
+    except:
+        pass
 
 # 3. หน้าต่าง Login
 if not st.session_state['logged_in']:
@@ -99,9 +106,13 @@ if not st.session_state['logged_in']:
                                     if status.lower() == 'approved':
                                         # 🌟 ล็อกอินผ่าน -> สั่งให้เบราว์เซอร์จำข้อมูลไว้เลย
                                         role_val = str(user_record.iloc[0].get('Role', 'user')).strip()
-                                        localS.setItem("logged_in", "true")
-                                        localS.setItem("username", input_user.strip())
-                                        localS.setItem("role", role_val)
+                                        # ✅ แก้เป็นแบบนี้
+                                        auth_data = json.dumps({
+                                            "logged_in": "true",
+                                            "username": input_user.strip(),
+                                            "role": role_val
+                                        })
+                                        localS.setItem("auth", auth_data)
                                         
                                         # อัปเดตสถานะให้เว็บ
                                         st.session_state['logged_in'] = True
