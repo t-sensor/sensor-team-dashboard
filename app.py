@@ -98,34 +98,208 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
     except: st.warning("กำลังรอข้อมูลจาก Google Sheets...")
 
 elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
-    st.title("🏢 ข้อมูลรายไซต์")
+
+    st.title("🏢 เจาะลึกข้อมูลรายไซต์ (Site Detail)")
+
+
+
     try:
+
         df_master = load_sheet("Master_Site")
+
         site_list = df_master['ชื่อไซต์งาน (Process Work)'].dropna().unique().tolist()
-        selected_site = st.selectbox("🔍 เลือกไซต์งาน:", site_list)
+
         
-        tab1, tab2, tab3 = st.tabs(["🗓️ แผน PM", "📡 อุปกรณ์", "🚨 ประวัติปัญหา"])
+
+        # 🌟 1. เพิ่มตัวเลือก "ดูทุกไซต์" ไว้บนสุด
+
+        site_options = ["🌐 ดูแผน PM รวมทุกไซต์ (All Sites)"] + site_list
+
+        selected_site = st.selectbox("🔍 ค้นหาหรือเลือกไซต์งานที่ต้องการดูข้อมูล:", site_options)
+
         
-        with tab1:
-            df_pm = load_sheet("PM_Plan")
-            df_pm.columns = [str(c).strip() for c in df_pm.columns]
-            site_pm = df_pm[df_pm['ชื่อไซต์งาน'] == selected_site]
-            if not site_pm.empty:
-                row = site_pm.iloc[0]
-                pm_cols = ['PM ใหญ่', 'PM ย่อย ครั้งที่ 1', 'PM ย่อย ครั้งที่ 2', 'PM ย่อย ครั้งที่ 3']
-                pm_data = [{"รอบ": c, "กำหนดการ": str(row[c])} for c in pm_cols if c in site_pm.columns and str(row[c]).strip() != "nan"]
-                st.table(pd.DataFrame(pm_data))
+
+        st.markdown("---")
+
         
-        with tab2:
-            df_assets = load_sheet("Asset_Sensor")
-            df_assets.columns = [str(c).strip() for c in df_assets.columns]
-            st.dataframe(df_assets[df_assets['ชื่อไซต์งาน'] == selected_site], use_container_width=True, hide_index=True)
+
+        # 🌟 2. ถ้ายกเลิกการเลือกไซต์ (ดูภาพรวมทั้งหมด)
+
+        if selected_site == "🌐 ดูแผน PM รวมทุกไซต์ (All Sites)":
+
+            st.subheader("🌐 ภาพรวมตารางแผน PM ทุกไซต์งานประจำปี")
+
+            try:
+
+                df_pm = load_sheet("PM_Plan")
+
+                st.dataframe(df_pm, use_container_width=True, hide_index=True)
+
+                st.info("💡 เลื่อนแถบด้านล่างตารางไปทางขวา เพื่อดูเดือนอื่นๆ ได้เลยครับ")
+
+            except Exception as e:
+
+                st.error(f"ไม่สามารถโหลดข้อมูลแผน PM รวมได้: {e}")
+
+                
+
+        # 🌟 3. ถ้าเลือกเจาะจงไซต์ใดไซต์หนึ่ง (โชว์ PM 4 ครั้งเน้นๆ)
+
+        else:
+
+            st.subheader(f"📍 ข้อมูลสรุปของไซต์: {selected_site}")
+
+            # สลับเอาแผน PM ขึ้นมาเป็นแท็บแรกเลย เพราะสำคัญสุด
+
+            tab1, tab2, tab3 = st.tabs(["🗓️ แผน PM (PM Plan)", "📡 อุปกรณ์ (Assets)", "🚨 ประวัติปัญหา (Issue Log)"])
+
             
-        with tab3:
-            df_tasks = load_sheet("Task & Workload")
-            df_tasks.columns = [str(c).strip() for c in df_tasks.columns]
-            st.dataframe(df_tasks[df_tasks['ชื่อไซต์งาน'] == selected_site], use_container_width=True, hide_index=True)
-    except: st.error("ไม่พบข้อมูล")
+
+            # --- Tab 1: แผนงานประจำปี (สกัดมาแค่ 4 ครั้ง) ---
+
+            with tab1:
+
+                try:
+
+                    df_pm = load_sheet("PM_Plan")
+
+                    df_pm.columns = [str(c).strip() for c in df_pm.columns]
+
+                    
+
+                    site_col = None
+
+                    for col in df_pm.columns:
+
+                        if "ชื่อไซต์" in str(col) or "Process Work" in str(col):
+
+                            site_col = col
+
+                            break
+
+                            
+
+                    if site_col:
+
+                        site_pm = df_pm[df_pm[site_col] == selected_site]
+
+                        if not site_pm.empty:
+
+                            # 🤖 ระบบสกัดข้อมูล: หาคอลัมน์ที่มีการกรอกแผนไว้
+
+                            pm_schedule = []
+
+                            row_data = site_pm.iloc[0] # ดึงข้อมูลแถวของไซต์นี้มา
+
+                            
+
+                            for col_name, val in row_data.items():
+
+                                val_str = str(val).strip()
+
+                                # เช็คว่าช่องนี้มีข้อมูล และไม่ใช่คอลัมน์ชื่อไซต์/กลุ่มงาน
+
+                                if val_str.lower() != 'nan' and val_str != '' and col_name != site_col and "กลุ่มงาน" not in col_name:
+
+                                    pm_schedule.append({
+
+                                        "ช่วงเวลา (เดือน_สัปดาห์)": col_name, 
+
+                                        "ประเภทงาน (ที่แพลนไว้)": val_str
+
+                                    })
+
+                            
+
+                            if pm_schedule:
+
+                                st.success(f"📌 ไซต์นี้มีกำหนดเข้าทำ PM จำนวน {len(pm_schedule)} ครั้ง ดังนี้ครับ:")
+
+                                st.dataframe(pd.DataFrame(pm_schedule), use_container_width=True, hide_index=True)
+
+                            else:
+
+                                st.info("ยังไม่มีการระบุแผน PM ในตารางสำหรับไซต์นี้ครับ")
+
+                        else:
+
+                            st.warning("ไม่พบชื่อไซต์นี้ในตาราง PM_Plan ครับ")
+
+                    else:
+
+                        st.error("หาคอลัมน์ 'ชื่อไซต์งาน' ในแผ่น PM_Plan ไม่เจอครับ")
+
+                except Exception as e:
+
+                    st.error(f"เกิดข้อผิดพลาดในการโหลดแผน PM: {e}")
+
+                    
+
+            # --- Tab 2: อุปกรณ์ที่ติดตั้ง ---
+
+            with tab2:
+
+                try:
+
+                    df_assets = load_sheet("Asset_Sensor")
+
+                    df_assets.columns = [str(c).strip() for c in df_assets.columns]
+
+                    if not df_assets.empty and 'ชื่อไซต์งาน' in df_assets.columns:
+
+                        site_assets = df_assets[df_assets['ชื่อไซต์งาน'] == selected_site]
+
+                        if not site_assets.empty:
+
+                            st.dataframe(site_assets.drop(columns=['ชื่อไซต์งาน']), use_container_width=True, hide_index=True)
+
+                        else:
+
+                            st.info("ยังไม่มีข้อมูลอุปกรณ์เซ็นเซอร์ติดตั้งสำหรับไซต์นี้ครับ")
+
+                except:
+
+                    st.warning("ระบบกำลังรอตาราง Asset_Sensor")
+
+                    
+
+            # --- Tab 3: ประวัติปัญหา ---
+
+            with tab3:
+
+                try:
+
+                    df_tasks = load_sheet("Task & Workload")
+
+                    df_tasks.columns = [str(c).strip() for c in df_tasks.columns]
+
+                    if not df_tasks.empty and 'ชื่อไซต์งาน' in df_tasks.columns:
+
+                        site_tasks = df_tasks[df_tasks['ชื่อไซต์งาน'] == selected_site]
+
+                        if not site_tasks.empty:
+
+                            show_problems_only = st.checkbox("🔥 โชว์เฉพาะงานที่ 'ติดปัญหา' (Problem)")
+
+                            if show_problems_only:
+
+                                site_tasks = site_tasks[site_tasks['สถานะงาน'] == 'Problem']
+
+                            st.dataframe(site_tasks.drop(columns=['ชื่อไซต์งาน']), use_container_width=True, hide_index=True)
+
+                        else:
+
+                            st.success("🎉 ไซต์นี้ยังไม่เคยมีประวัติปัญหาเลยครับ ยอดเยี่ยมมาก!")
+
+                except:
+
+                    st.warning("ระบบกำลังรอตาราง Task & Workload")
+
+
+
+    except Exception as e:
+
+        st.error(f"ระบบขัดข้อง กรุณาตรวจสอบแผ่น Master_Site ใน GSheet: {e}")
 
 elif menu == "📱 3. กระดานงานส่วนตัว (My Workload)":
     st.title("📱 งานของฉัน")
