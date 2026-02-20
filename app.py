@@ -8,7 +8,11 @@ import urllib.parse # 👈 เพิ่มบรรทัดนี้เพื�
 import plotly.express as px # 👈 เพิ่มบรรทัดนี้สำหรับวาดกราฟ
 
 # ... (โค้ดดึงบรรทัด import และ st.secrets เดิมของคุณ Heart) ...
+st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
+# 👇 ตรงนี้แหละครับที่หายไป! (กุญแจเชื่อมต่อ GSheet)
+GAS_URL = st.secrets["https://script.google.com/macros/s/AKfycbyUbNDL14r3opbds0Cq53Yx_CDtO7aS7MUIQQojs37ay4vWH95cWna1Gd7RXm7_m4zRDA/exec"]
+SHEET_URL = st.secrets["https://docs.google.com/spreadsheets/d/1gsVokK85rj4PjHKUjdiBiEq-mtmEMfgTD8GGIvHzRWY/edit?usp=sharing"]
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
 @st.cache_data(ttl=60)
 def load_sheet(sheet_name):
