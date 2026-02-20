@@ -63,13 +63,9 @@ if not st.session_state['logged_in']:
             
             if submitted:
                 if input_user and input_pass:
-                    with st.spinner("กำลังตรวจสอบข้อมูล..."):
+                   with st.spinner("กำลังตรวจสอบข้อมูล..."):
                         try:
                             df_users = load_sheet("Users_DB")
-                            
-                            # 👇 แทรกบรรทัดนี้ลงไปตรงนี้เลยครับ (ระหว่าง load_sheet กับ df_users.columns)
-                            st.write("👀 แอบดูข้อมูลที่ดึงมาได้:", df_users)
-                            
                             df_users.columns = [str(c).replace('\n', '').strip() for c in df_users.columns]
                             
                             if 'Username' in df_users.columns and 'Password' in df_users.columns:
