@@ -33,13 +33,38 @@ def send_line_message(message):
     }
     payload = {
         "to": group_id,
-        "messages": [{"type": "text", "text": message}]
+        "messages": [
+            {
+                # ✅ ข้อความที่ 1: @all mention
+                "type": "textV2",
+                "text": "@all",
+                "mentionedUserIds": [],
+                "mentions": [
+                    {
+                        "index": 0,
+                        "length": 4,
+                        "type": "all"
+                    }
+                ]
+            },
+            {
+                # ✅ ข้อความที่ 2: รายละเอียดงาน
+                "type": "text",
+                "text": message
+            }
+        ]
     }
-    requests.post(
-        "https://api.line.me/v2/bot/message/push",
-        headers=headers,
-        data=json.dumps(payload)
-    )
+    try:
+        response = requests.post(
+            "https://api.line.me/v2/bot/message/push",
+            headers=headers,
+            data=json.dumps(payload)
+        )
+        if response.status_code != 200:
+            st.warning(f"LINE Error: {response.text}")
+    except Exception as e:
+        st.warning(f"ส่ง LINE ไม่สำเร็จ: {e}")
+
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
