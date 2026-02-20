@@ -18,11 +18,16 @@ SHEET_URL = st.secrets["SHEET_URL"]
 
 
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
-@st.cache_data(ttl=10)
+# 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
+@st.cache_data(ttl=5) # 🚀 ลดเวลาให้เหลือ 5 วินาที
 def load_sheet(sheet_name):
+    import time
     sheet_id = SHEET_URL.split("/d/")[1].split("/")[0]
     encoded_sheet_name = urllib.parse.quote(sheet_name)
-    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}"
+    
+    # 🚀 ทะลวง Cache Google ด้วยการแนบเวลาปัจจุบัน (&t=...) ต่อท้ายลิงก์
+    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}&t={int(time.time())}"
+    
     return pd.read_csv(csv_url)
 
 # =========================================================
