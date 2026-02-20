@@ -43,28 +43,39 @@ if not st.session_state['logged_in']:
             if submitted:
                 if input_user and input_pass:
                     with st.spinner("กำลังตรวจสอบข้อมูล..."):
-                        try:
-                            # โหลดฐานข้อมูลผู้ใช้งานจาก GSheet
+try:
                             df_users = load_sheet("Users_DB")
-                            df_users.columns = [str(c).strip() for c in df_users.columns]
                             
-                            # เช็ค Username และ Password
-                            user_record = df_users[(df_users['Username'] == input_user) & (df_users['Password'] == input_pass)]
+                            # 1. 🚀 แปลงชื่อคอลัมน์ให้ลบเว้นวรรคและการขึ้นบรรทัดใหม่ทั้งหมด
+                            df_users.columns = [str(c).replace('\n', '').strip() for c in df_users.columns]
                             
-                            if not user_record.empty:
-                                status = str(user_record.iloc[0].get('Status', '')).strip()
-                                # ตรวจสอบการอนุมัติ
-                                if status == 'Approved':
-                                    st.session_state['logged_in'] = True
-                                    st.session_state['username'] = input_user
-                                    st.session_state['role'] = str(user_record.iloc[0].get('Role', 'user')).strip()
-                                    st.rerun() # รีเฟรชหน้าเพื่อเข้าแอป
+                            # 2. 🚀 เช็คก่อนว่ามีคอลัมน์ Username และ Password ไหม
+                            if 'Username' in df_users.columns and 'Password' in df_users.columns:
+                                
+                                # 3. 🚀 ตัดช่องว่างที่อาจเผลอพิมพ์ติดมาทั้งฝั่ง GSheet และฝั่งคนกรอก
+                                df_users['Username'] = df_users['Username'].astype(str).str.strip()
+                                df_users['Password'] = df_users['Password'].astype(str).str.strip()
+                                
+                                # ค้นหาว่าตรงกันไหม
+                                user_record = df_users[(df_users['Username'] == input_user.strip()) & (df_users['Password'] == input_pass.strip())]
+                                
+                                if not user_record.empty:
+                                    status = str(user_record.iloc[0].get('Status', '')).strip()
+                                    # เช็คสถานะ Approved (แปลงเป็นพิมพ์เล็กทั้งหมดเพื่อกันพลาด)
+                                    if status.lower() == 'approved':
+                                        st.session_state['logged_in'] = True
+                                        st.session_state['username'] = input_user.strip()
+                                        st.session_state['role'] = str(user_record.iloc[0].get('Role', 'user')).strip()
+                                        st.rerun() 
+                                    else:
+                                        st.error("⚠️ บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบอนุมัติ")
                                 else:
-                                    st.error("⚠️ บัญชีของคุณอยู่ระหว่างรอคุณ Heart อนุมัติครับ")
+                                    st.error("❌ Username หรือ Password ไม่ถูกต้อง")
                             else:
-                                st.error("❌ Username หรือ Password ไม่ถูกต้อง")
+                                st.error(f"ไม่พบคอลัมน์ 'Username' หรือ 'Password' (คอลัมน์ที่มีคือ: {df_users.columns.tolist()})")
+                                
                         except Exception as e:
-                            st.warning("รอการเชื่อมต่อฐานข้อมูล Users_DB (กรุณาสร้างแผ่นนี้ใน GSheet)")
+                            st.warning(f"ระบบไม่สามารถเชื่อมต่อฐานข้อมูล Users ได้ ({e})")
                 else:
                     st.warning("กรุณากรอกข้อมูลให้ครบถ้วน")
         
