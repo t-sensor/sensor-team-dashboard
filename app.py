@@ -49,7 +49,7 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
     st.markdown("---")
 
     try:
-        # โหลดข้อมูลพื้นฐาน
+        # 1. โหลดข้อมูลพื้นฐาน
         df_pm = load_sheet("PM_Plan")
         df_task = load_sheet("Task & Workload")
         df_master = load_sheet("Master_Site")
@@ -64,11 +64,13 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
         thai_months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."]
         cur_m_name = thai_months[cur_m - 1]
 
-        # KPI Metrics
-        total_sites = len(df_pm['ชื่อไซต์งาน'].dropna().unique()) if 'ชื่อไซต์งาน' in df_pm.columns else 0
+        # 2. สรุปตัวเลข KPI
+        # นับจำนวนไซต์จาก Master_Site เพื่อความแม่นยำ
+        total_sites_count = len(df_master['ชื่อไซต์งาน (Process Work)'].dropna().unique()) if 'ชื่อไซต์งาน (Process Work)' in df_master.columns else 0
         active_tasks = len(df_task[df_task['สถานะงาน'] != 'Complete']) if 'สถานะงาน' in df_task.columns else 0
+        
         c1, c2, c3 = st.columns(3)
-        c1.metric("🏢 ไซต์งานทั้งหมด", f"{total_sites} ไซต์")
+        c1.metric("🏢 จำนวนไซต์งานทั้งหมด", f"{total_sites_count} ไซต์")
         c2.metric("📋 งานที่กำลังทำ", f"{active_tasks} งาน")
         c3.metric("📅 เดือนปัจจุบัน", cur_m_name)
 
@@ -87,44 +89,57 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
             site_name = str(row['ชื่อไซต์งาน']).strip()
             pm_done = str(row.get('สถานะ PM', '')).strip()
             
-            # ถ้ากดปุ่ม PM แล้ว ให้เป็นสีเขียวทันที
             if "PM แล้ว" in pm_done:
                 final_status, m_color, due_date = "🟢 PM เรียบร้อยแล้ว / ยังไม่ถึงรอบ", "green", "Completed"
             else:
+                # 🛠️ จุดที่แก้ไข: เปลี่ยนจาก row[col] เป็น row[c] เพื่อแก้ Error
                 site_dates = [str(row[c]).strip() for c in pm_cols if c in row and str(row[c]).strip() not in ["nan", "-", ""]]
                 final_status, m_color, due_date = "🟢 PM เรียบร้อยแล้ว / ยังไม่ถึงรอบ", "green", "-"
-                p_score = 4 # 1:Red, 2:Orange, 3:Yellow, 4:Green
+                p_score = 4 
                 
                 for d_str in site_dates:
                     m_part = d_str.split(' ')[0]
                     if m_part in thai_months:
                         m_idx = thai_months.index(m_part) + 1
-                        if m_idx < cur_m: # เลยกำหนด
+                        if m_idx < cur_m: 
                             if p_score > 1: final_status, m_color, due_date, p_score = "🔴 ผ่านมาแล้ว (เลยกำหนด)", "red", d_str, 1
-                        elif m_idx == cur_m: # เดือนนี้
+                        elif m_idx == cur_m: 
                             if p_score > 2: final_status, m_color, due_date, p_score = "🟠 เดือนนี้ (ต้องเข้าทำ)", "orange", d_str, 2
-                        elif m_idx == cur_m + 1 or (cur_m == 12 and m_idx == 1): # เดือนหน้า
+                        elif m_idx == cur_m + 1 or (cur_m == 12 and m_idx == 1): 
                             if p_score > 3: final_status, m_color, due_date, p_score = "🟡 เดือนหน้า (เตรียมตัว)", "beige", d_str, 3
 
             site_colors[site_name] = m_color
             pm_status_list.append({"ชื่อไซต์งาน": site_name, "สถานะ": final_status, "กำหนดการ": due_date})
 
         df_status = pd.DataFrame(pm_status_list)
+        
+        # 🌟 เพิ่มส่วนแสดงรายชื่อไซต์งานทั้งหมดที่มี
+        with st.expander(f"📂 รายชื่อไซต์งานทั้งหมด ({total_sites_count} ไซต์)"):
+            if not df_master.empty:
+                st.dataframe(df_master[['กลุ่มงาน (County)', 'ชื่อไซต์งาน (Process Work)']], use_container_width=True, hide_index=True)
+            else:
+                st.info("ไม่มีข้อมูลใน Master_Site")
+
+        # ตารางสถานะที่กรองแล้ว
         if filter_choice != "แสดงทั้งหมด":
             df_status = df_status[df_status['สถานะ'] == filter_choice]
+        
+        st.markdown("### 🗓️ ตารางติดตามสถานะ PM")
         st.dataframe(df_status.sort_values(by="สถานะ"), use_container_width=True, hide_index=True)
 
-        # 🗺️ แผนที่ที่เปลี่ยนสีหมุดตามสถานะ
+        # 🗺️ แผนที่
         st.markdown("### 🗺️ แผนที่พิกัดไซต์งาน (สีหมุดตามสถานะ PM)")
-        if 'ละติจูด (Latitude)' in df_master.columns:
+        if not df_master.empty and 'ละติจูด (Latitude)' in df_master.columns:
             m = folium.Map(location=[13.73, 100.52], zoom_start=6)
             for _, r in df_master.dropna(subset=['ละติจูด (Latitude)', 'ลองจิจูด (Longitude)']).iterrows():
                 s_name = str(r['ชื่อไซต์งาน (Process Work)']).strip()
-                dot_color = site_colors.get(s_name, "gray") # ดึงสีที่คำนวณไว้มาใช้
+                dot_color = site_colors.get(s_name, "gray")
                 folium.Marker([r['ละติจูด (Latitude)'], r['ลองจิจูด (Longitude)']], 
                               popup=s_name, icon=folium.Icon(color=dot_color)).add_to(m)
             st_folium(m, width=1000, height=400)
-    except Exception as e: st.warning(f"ระบบกำลังโหลดข้อมูล... ({e})")
+            
+    except Exception as e: 
+        st.warning(f"ระบบกำลังโหลดข้อมูล... ({e})")
 
 # --- ส่วนที่ 2: เพิ่มปุ่มกด PM แล้ว (เมนู 2) ---
 elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
