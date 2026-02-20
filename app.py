@@ -63,44 +63,47 @@ if not st.session_state['logged_in']:
             
             if submitted:
                 if input_user and input_pass:
-                  with st.spinner("กำลังตรวจสอบข้อมูล..."):
+with st.spinner("กำลังตรวจสอบข้อมูล..."):
                         try:
                             df_users = load_sheet("Users_DB")
                             
-                            # 👇 แทรกบรรทัดนี้ลงไปตรงนี้เลยครับ (ระหว่าง load_sheet กับ df_users.columns)
-                            st.write("👀 แอบดูข้อมูลที่ดึงมาได้:", df_users)
-                            
+                            # 🚀 ล้างหัวคอลัมน์ให้สะอาดที่สุด
                             df_users.columns = [str(c).replace('\n', '').strip() for c in df_users.columns]
                             
                             if 'Username' in df_users.columns and 'Password' in df_users.columns:
+                                # แปลงทุกอย่างเป็น String และตัดช่องว่าง
                                 df_users['Username'] = df_users['Username'].astype(str).str.strip()
                                 df_users['Password'] = df_users['Password'].astype(str).str.strip()
+                                df_users['Status'] = df_users['Status'].astype(str).str.strip()
+
+                                # 🚀 เช็ค Login (Username และ Password ต้องตรงเป๊ะ)
+                                user_match = df_users[
+                                    (df_users['Username'] == input_user.strip()) & 
+                                    (df_users['Password'] == input_pass.strip())
+                                ]
                                 
-                                user_record = df_users[(df_users['Username'] == input_user.strip()) & (df_users['Password'] == input_pass.strip())]
-                                
-                                if not user_record.empty:
-                                    status = str(user_record.iloc[0].get('Status', '')).strip()
-                                    if status.lower() == 'approved':
-                                        # 🌟 ล็อกอินผ่าน -> สั่งให้เบราว์เซอร์จำข้อมูลไว้เลย
-                                        role_val = str(user_record.iloc[0].get('Role', 'user')).strip()
+                                if not user_match.empty:
+                                    status_val = str(user_match.iloc[0].get('Status', '')).strip()
+                                    
+                                    # 🚀 เช็ค Status แบบไม่สนตัวพิมพ์เล็กใหญ่
+                                    if status_val.lower() == 'approved':
+                                        role_val = str(user_match.iloc[0].get('Role', 'user')).strip().lower()
+                                        
+                                        # บันทึกลง Local Storage
                                         localS.setItem("logged_in", "true")
                                         localS.setItem("username", input_user.strip())
                                         localS.setItem("role", role_val)
                                         
-                                        # อัปเดตสถานะให้เว็บ
                                         st.session_state['logged_in'] = True
                                         st.session_state['username'] = input_user.strip()
                                         st.session_state['role'] = role_val
-                                        
-                                        st.success("เข้าสู่ระบบสำเร็จ! กรุณารอสักครู่...")
-                                        time.sleep(1)
                                         st.rerun() 
                                     else:
-                                        st.error("⚠️ บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบอนุมัติครับ")
+                                        st.error(f"⚠️ บัญชี '{input_user}' ยังไม่ได้รับการอนุมัติ (Status: {status_val})")
                                 else:
                                     st.error("❌ Username หรือ Password ไม่ถูกต้อง")
                             else:
-                                st.error("ไม่พบคอลัมน์ 'Username' หรือ 'Password' ใน Google Sheets")
+                                st.error(f"หาหัวคอลัมน์ไม่เจอ! ในชีตมี: {list(df_users.columns)}")
                         except Exception as e:
                             st.warning(f"รอการเชื่อมต่อฐานข้อมูล Users_DB ({e})")
                 else:
