@@ -4,3 +4,4 @@ folium
 streamlit-folium
 plotly
 st-gsheets-connection
+extra-streamlit-components
