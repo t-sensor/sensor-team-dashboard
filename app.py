@@ -64,7 +64,7 @@ if not st.session_state['logged_in']:
                   with st.spinner("กำลังตรวจสอบข้อมูล..."):
                         try:
                             df_users = load_sheet("Users_DB")
-
+st.write("👀 แอบดูข้อมูลที่ดึงมาได้:", df_users)
                             
                             df_users.columns = [str(c).replace('\n', '').strip() for c in df_users.columns]
                             
