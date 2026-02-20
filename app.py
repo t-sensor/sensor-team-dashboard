@@ -31,26 +31,25 @@ def send_line_message(message):
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
+    
+    # รวม @all เข้าไปข้างหน้าข้อความ
+    full_text = f"@all\n{message}"
+    
     payload = {
         "to": group_id,
         "messages": [
             {
-                # ✅ ข้อความที่ 1: @all mention
-                "type": "textV2",
-                "text": "@all",
-                "mentionedUserIds": [],
-                "mentions": [
-                    {
-                        "index": 0,
-                        "length": 4,
-                        "type": "all"
-                    }
-                ]
-            },
-            {
-                # ✅ ข้อความที่ 2: รายละเอียดงาน
                 "type": "text",
-                "text": message
+                "text": full_text,
+                "mention": { # 👈 ใช้ 'mention' (ไม่มี s)
+                    "mentions": [ # 👈 ข้างในเป็น List ของ 'mentions'
+                        {
+                            "index": 0,    # เริ่มแท็กที่ตำแหน่งแรก (ตัว @)
+                            "length": 4,   # ความยาวของคำว่า @all
+                            "type": "all"  # ประเภทการแท็กแบบทั้งหมด
+                        }
+                    ]
+                }
             }
         ]
     }
@@ -64,7 +63,6 @@ def send_line_message(message):
             st.warning(f"LINE Error: {response.text}")
     except Exception as e:
         st.warning(f"ส่ง LINE ไม่สำเร็จ: {e}")
-
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
