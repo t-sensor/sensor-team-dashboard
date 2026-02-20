@@ -8,7 +8,22 @@ from streamlit_folium import st_folium
 import urllib.parse
 import plotly.express as px
 import time
+import re
 
+def check_password_strength(password):
+    """ตรวจสอบว่ารหัสผ่านแข็งแกร่งพอไหม"""
+    errors = []
+    
+    if len(password) < 8:
+        errors.append("❌ ความยาวต้องมีอย่างน้อย 8 ตัวอักษร")
+    if not re.search(r'[A-Za-z]', password):
+        errors.append("❌ ต้องมีตัวอักษรภาษาอังกฤษอย่างน้อย 1 ตัว")
+    if not re.search(r'[0-9]', password):
+        errors.append("❌ ต้องมีตัวเลขอย่างน้อย 1 ตัว")
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=/\\]', password):
+        errors.append("❌ ต้องมีอักขระพิเศษ เช่น !@#$% อย่างน้อย 1 ตัว")
+    
+    return errors
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
@@ -26,7 +41,12 @@ def load_sheet(sheet_name):
     encoded_sheet_name = urllib.parse.quote(sheet_name)
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}&t={int(time.time())}"
     
-    return pd.read_csv(csv_url, dtype=str)  # 👈 เพิ่มแค่ dtype=str ตรงนี้
+    return pd.read_csv(
+        csv_url, 
+        dtype=str,              # บังคับทุก Column เป็น String
+        keep_default_na=False,  # 👈 ห้าม Pandas แปลงค่าเป็น NaN เอง
+        na_values=['']          # 👈 ถือว่า NaN ก็แค่เซลล์ว่างเท่านั้น
+    )
 
 # =========================================================
 # 🔐 ระบบตรวจสอบการ Login (จำรหัสด้วย Local Storage)
