@@ -18,7 +18,7 @@ SHEET_URL = st.secrets["SHEET_URL"]
 
 
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=10)
 def load_sheet(sheet_name):
     sheet_id = SHEET_URL.split("/d/")[1].split("/")[0]
     encoded_sheet_name = urllib.parse.quote(sheet_name)
