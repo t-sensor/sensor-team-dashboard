@@ -32,8 +32,9 @@ def send_line_message(message):
         "Content-Type": "application/json"
     }
     
-    # รวม @all เข้าไปข้างหน้าข้อความ
-    full_text = f"@all\n{message}"
+    # เพิ่มเว้นวรรคหลัง @all 1 ที (เป็นเทคนิคให้แท็กติดง่ายขึ้น)
+    mention_text = "@all " 
+    full_text = f"{mention_text}\n{message}"
     
     payload = {
         "to": group_id,
@@ -41,12 +42,12 @@ def send_line_message(message):
             {
                 "type": "text",
                 "text": full_text,
-                "mention": { # 👈 ใช้ 'mention' (ไม่มี s)
-                    "mentions": [ # 👈 ข้างในเป็น List ของ 'mentions'
+                "mention": {
+                    "mentions": [
                         {
-                            "index": 0,    # เริ่มแท็กที่ตำแหน่งแรก (ตัว @)
-                            "length": 4,   # ความยาวของคำว่า @all
-                            "type": "all"  # ประเภทการแท็กแบบทั้งหมด
+                            "index": 0,
+                            "length": 4, # คลุมแค่ '@all' ไม่รวมเว้นวรรค
+                            "type": "ALL"
                         }
                     ]
                 }
@@ -60,9 +61,9 @@ def send_line_message(message):
             data=json.dumps(payload)
         )
         if response.status_code != 200:
-            st.warning(f"LINE Error: {response.text}")
+            st.error(f"LINE API Error: {response.text}") # ใช้ st.error เพื่อให้เห็นชัดๆ ตอนเทส
     except Exception as e:
-        st.warning(f"ส่ง LINE ไม่สำเร็จ: {e}")
+        st.error(f"ส่ง LINE ไม่สำเร็จ: {e}")
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
