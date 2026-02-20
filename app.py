@@ -175,6 +175,7 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
             tab1, tab2, tab3 = st.tabs(["🗓️ แผน PM (PM Plan)", "📡 อุปกรณ์ (Assets)", "🚨 ประวัติปัญหา (Issue Log)"])
             
             # --- Tab 1: แผนงานประจำปี (4 ครั้ง + วันที่ซิม) ---
+# --- Tab 1 ในเมนู 2 (เวอร์ชันมีปุ่ม Reset) ---
             with tab1:
                 try:
                     df_pm = load_sheet("PM_Plan")
@@ -183,39 +184,45 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
                     
                     if not site_pm.empty:
                         row_data = site_pm.iloc[0]
+                        current_status = str(row_data.get('สถานะ PM', '')).strip() # ดึงสถานะปัจจุบันมาเช็ค
+                        
+                        # (โค้ดแสดงตาราง PM 4 ครั้ง และ วันที่ซิม เหมือนเดิม...)
                         pm_cols = ['PM ใหญ่', 'PM ย่อย ครั้งที่ 1', 'PM ย่อย ครั้งที่ 2', 'PM ย่อย ครั้งที่ 3']
-                        pm_schedule = []
-                        pm_count = 0
+                        pm_schedule = [{"รอบการทำงาน": c, "กำหนดการ": str(row_data[c])} for c in pm_cols if c in site_pm.columns and str(row_data[c]).strip() not in ["nan", "-"]]
                         
-                        for col in pm_cols:
-                            if col in site_pm.columns:
-                                val = str(row_data[col]).strip()
-                                if val and val.lower() != 'nan' and val != '-':
-                                    pm_schedule.append({"รอบการทำงาน": col, "กำหนดการ (เดือน_สัปดาห์)": val})
-                                    pm_count += 1
+                        st.success(f"📌 กำหนดเข้าทำ PM ของ {selected_site}")
+                        if pm_schedule: st.table(pd.DataFrame(pm_schedule))
                         
-                        st.success(f"📌 ไซต์นี้มีกำหนดเข้าทำ PM จำนวน {pm_count} ครั้ง ดังนี้ครับ:")
-                        if pm_schedule:
-                            st.table(pd.DataFrame(pm_schedule))
-                        
-                        # วันที่ซิมหมดอายุ (แยกออกมาเป็นแถบเตือน)
                         if 'วันที่ซิมหมดอายุ' in site_pm.columns:
                             sim_date = str(row_data['วันที่ซิมหมดอายุ']).strip()
-                            if sim_date and sim_date.lower() != 'nan' and sim_date != '-':
-                                st.warning(f"📶 **วันที่ซิมหมดอายุ:** {sim_date}")
-                        
-                        # ปุ่มบันทึกผล (Red Primary Button)
+                            if sim_date and sim_date.lower() != 'nan': st.warning(f"📶 **วันที่ซิมหมดอายุ:** {sim_date}")
+
                         st.markdown("---")
-                        if st.button(f"✅ บันทึกว่า {selected_site} ทำ PM รอบนี้เสร็จแล้ว", type="primary"):
-                            payload = {"action": "update_pm_status", "sheet": "PM_Plan", "siteName": selected_site, "status": "PM แล้ว"}
-                            with st.spinner("กำลังส่งข้อมูลอัปเดตไปยังระบบ Dashboard..."):
-                                try:
-                                    res = requests.post(GAS_URL, data=json.dumps(payload))
-                                    if res.json().get("status") == "success":
-                                        st.success("🎉 บันทึกสำเร็จ! ไซต์นี้จะแสดงเป็น 'สีเขียว' ในหน้า Dashboard แล้วครับ")
-                                        st.cache_data.clear()
-                                except:
-                                    st.error("การเชื่อมต่อขัดข้อง กรุณาลองอีกครั้ง")
+                        
+                        # 🌟 ส่วนที่เพิ่มใหม่: ระบบเช็คสถานะเพื่อสลับปุ่ม
+                        if current_status == "PM แล้ว":
+                            st.info("✅ ไซต์นี้บันทึกว่าทำ PM เสร็จเรียบร้อยแล้ว")
+                            if st.button(f"↩️ เผลอกดผิด? (ยกเลิกสถานะ PM ของ {selected_site})", type="secondary"):
+                                payload = {"action": "update_pm_status", "sheet": "PM_Plan", "siteName": selected_site, "status": ""} # ส่งค่าว่างไปลบใน GSheet
+                                with st.spinner("กำลังยกเลิกสถานะ..."):
+                                    try:
+                                        res = requests.post(GAS_URL, data=json.dumps(payload))
+                                        if res.json().get("status") == "success":
+                                            st.success("ยกเลิกสำเร็จ! ข้อมูลจะกลับไปโชว์ตามรอบวันที่ปกติแล้วครับ")
+                                            st.cache_data.clear()
+                                            st.rerun()
+                                    except: st.error("ขัดข้อง")
+                        else:
+                            if st.button(f"✅ บันทึกว่า {selected_site} ทำ PM รอบนี้เสร็จแล้ว", type="primary"):
+                                payload = {"action": "update_pm_status", "sheet": "PM_Plan", "siteName": selected_site, "status": "PM แล้ว"}
+                                with st.spinner("กำลังบันทึก..."):
+                                    try:
+                                        res = requests.post(GAS_URL, data=json.dumps(payload))
+                                        if res.json().get("status") == "success":
+                                            st.success("บันทึกสำเร็จ!")
+                                            st.cache_data.clear()
+                                            st.rerun()
+                                    except: st.error("ขัดข้อง")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
                     
