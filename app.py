@@ -1,5 +1,5 @@
 import streamlit as st
-from local_storage import LocalStorage # 🌟 เปลี่ยนมาใช้ตัวนี้แทน เสถียร 100%
+from streamlit_local_storage import LocalStorage # 🌟 แก้ตรงนี้ครับ (เพิ่ม streamlit_ นำหน้า)
 import requests
 import json
 import pandas as pd
@@ -15,6 +15,7 @@ st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="
 # กุญแจเชื่อมต่อ GSheet
 GAS_URL = st.secrets["GAS_URL"]
 SHEET_URL = st.secrets["SHEET_URL"]
+
 
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
 @st.cache_data(ttl=60)
