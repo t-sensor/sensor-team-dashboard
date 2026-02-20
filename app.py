@@ -19,16 +19,14 @@ SHEET_URL = st.secrets["SHEET_URL"]
 
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
-@st.cache_data(ttl=5) # 🚀 ลดเวลาให้เหลือ 5 วินาที
+@st.cache_data(ttl=5)
 def load_sheet(sheet_name):
     import time
     sheet_id = SHEET_URL.split("/d/")[1].split("/")[0]
     encoded_sheet_name = urllib.parse.quote(sheet_name)
-    
-    # 🚀 ทะลวง Cache Google ด้วยการแนบเวลาปัจจุบัน (&t=...) ต่อท้ายลิงก์
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}&t={int(time.time())}"
     
-    return pd.read_csv(csv_url)
+    return pd.read_csv(csv_url, dtype=str)  # 👈 เพิ่มแค่ dtype=str ตรงนี้
 
 # =========================================================
 # 🔐 ระบบตรวจสอบการ Login (จำรหัสด้วย Local Storage)
@@ -66,9 +64,7 @@ if not st.session_state['logged_in']:
                   with st.spinner("กำลังตรวจสอบข้อมูล..."):
                         try:
                             df_users = load_sheet("Users_DB")
-                            
-                            # 👇 แทรกบรรทัดนี้ลงไปตรงนี้เลยครับ (ระหว่าง load_sheet กับ df_users.columns)
-                            st.write("👀 แอบดูข้อมูลที่ดึงมาได้:", df_users)
+
                             
                             df_users.columns = [str(c).replace('\n', '').strip() for c in df_users.columns]
                             
