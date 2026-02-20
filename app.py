@@ -1,20 +1,21 @@
-import extra_streamlit_components as stx
-import time
 import streamlit as st
+from local_storage import LocalStorage # 🌟 เปลี่ยนมาใช้ตัวนี้แทน เสถียร 100%
 import requests
 import json
 import pandas as pd
 import folium
 from streamlit_folium import st_folium
-import urllib.parse # 👈 เพิ่มบรรทัดนี้เพื่อใช้แปลงอักษรพิเศษใน URL
-import plotly.express as px # 👈 เพิ่มบรรทัดนี้สำหรับวาดกราฟ
+import urllib.parse
+import plotly.express as px
+import time
 
-# ... (โค้ดดึงบรรทัด import และ st.secrets เดิมของคุณ Heart) ...
+# --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
-# 👇 ตรงนี้แหละครับที่หายไป! (กุญแจเชื่อมต่อ GSheet)
+# กุญแจเชื่อมต่อ GSheet
 GAS_URL = st.secrets["GAS_URL"]
 SHEET_URL = st.secrets["SHEET_URL"]
+
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
 @st.cache_data(ttl=60)
 def load_sheet(sheet_name):
@@ -23,26 +24,25 @@ def load_sheet(sheet_name):
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}"
     return pd.read_csv(csv_url)
 
-# 🔐 --- ระบบ Authentication & Session State (อัปเกรดจำรหัสด้วย Cookie) --- 🔐
-# สร้างตัวจัดการ Cookie
-@st.cache_resource
-def get_cookie_manager():
-    return stx.CookieManager()
+# =========================================================
+# 🔐 ระบบตรวจสอบการ Login (จำรหัสด้วย Local Storage)
+# =========================================================
+# เรียกใช้ระบบความจำของเบราว์เซอร์
+localS = LocalStorage()
 
-cookie_manager = get_cookie_manager()
+# 1. ตั้งค่าเริ่มต้นให้ Session
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+    st.session_state['username'] = ''
+    st.session_state['role'] = ''
 
-# 1. เช็คว่ามี Cookie เก่าที่เคยล็อกอินค้างไว้ในเบราว์เซอร์ไหม
-if cookie_manager.get(cookie="logged_in") == "true":
+# 2. เช็คว่าเบราว์เซอร์เคยจำรหัสผ่านไว้ไหม (ถ้าเคย ให้ข้ามหน้า Login ไปเลย!)
+if localS.getItem("logged_in") == "true":
     st.session_state['logged_in'] = True
-    st.session_state['username'] = cookie_manager.get(cookie="username")
-    st.session_state['role'] = cookie_manager.get(cookie="role")
-else:
-    if 'logged_in' not in st.session_state:
-        st.session_state['logged_in'] = False
-        st.session_state['username'] = ''
-        st.session_state['role'] = ''
+    st.session_state['username'] = localS.getItem("username")
+    st.session_state['role'] = localS.getItem("role")
 
-# 2. หน้าต่าง Login
+# 3. หน้าต่าง Login
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center; color: #008080;'>🔐 Sensor Team Login</h1>", unsafe_allow_html=True)
     st.markdown("---")
@@ -71,17 +71,19 @@ if not st.session_state['logged_in']:
                                 if not user_record.empty:
                                     status = str(user_record.iloc[0].get('Status', '')).strip()
                                     if status.lower() == 'approved':
-                                        # 🌟 ล็อกอินสำเร็จ -> บันทึกข้อมูลลง Cookie ให้จำค่า!
-                                        cookie_manager.set("logged_in", "true")
-                                        cookie_manager.set("username", input_user.strip())
-                                        cookie_manager.set("role", str(user_record.iloc[0].get('Role', 'user')).strip())
+                                        # 🌟 ล็อกอินผ่าน -> สั่งให้เบราว์เซอร์จำข้อมูลไว้เลย
+                                        role_val = str(user_record.iloc[0].get('Role', 'user')).strip()
+                                        localS.setItem("logged_in", "true")
+                                        localS.setItem("username", input_user.strip())
+                                        localS.setItem("role", role_val)
                                         
+                                        # อัปเดตสถานะให้เว็บ
                                         st.session_state['logged_in'] = True
                                         st.session_state['username'] = input_user.strip()
-                                        st.session_state['role'] = str(user_record.iloc[0].get('Role', 'user')).strip()
+                                        st.session_state['role'] = role_val
                                         
                                         st.success("เข้าสู่ระบบสำเร็จ! กรุณารอสักครู่...")
-                                        time.sleep(1) # ให้เวลาเบราว์เซอร์กลืน Cookie แป๊บนึง
+                                        time.sleep(1)
                                         st.rerun() 
                                     else:
                                         st.error("⚠️ บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบอนุมัติครับ")
@@ -134,15 +136,15 @@ role_color = "🟢" if CURRENT_ROLE == 'admin' else ("🔵" if CURRENT_ROLE == '
 st.sidebar.info(f"👨‍💻 เข้าสู่ระบบโดย: **{CURRENT_USER}**\n\n{role_color} ระดับสิทธิ์: {CURRENT_ROLE.upper()}")
 
 # ปุ่ม Logout
+# ปุ่ม Logout
 if st.sidebar.button("🚪 ออกจากระบบ", use_container_width=True):
-    cookie_manager.delete("logged_in")
-    cookie_manager.delete("username")
-    cookie_manager.delete("role")
+    # ล้างความจำในเบราว์เซอร์
+    localS.deleteAll()
     
     st.session_state['logged_in'] = False
     st.session_state['username'] = ''
     st.session_state['role'] = ''
-    time.sleep(1) # ให้เวลาลบ Cookie นิดนึง
+    time.sleep(1)
     st.rerun()
 
 # --- 4. โครงสร้างแต่ละเมนู (โค้ด Dashboard ที่เหลือของคุณ Heart จะต่อจากตรงนี้ลงไปเหมือนเดิมครับ) ---
