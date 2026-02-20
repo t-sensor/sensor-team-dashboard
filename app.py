@@ -1,3 +1,5 @@
+import extra_streamlit_components as stx
+import time
 import streamlit as st
 import requests
 import json
@@ -21,18 +23,26 @@ def load_sheet(sheet_name):
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={encoded_sheet_name}"
     return pd.read_csv(csv_url)
 
-# 🔐 --- ระบบ Authentication & Session State --- 🔐
-# =========================================================
-# 🔐 1. ระบบตรวจสอบการ Login (Authentication)
-# =========================================================
-# ตั้งค่าหน่วยความจำ (Session) ให้จำสถานะการล็อกอินเวลารีเฟรช
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
-    st.session_state['username'] = ''
-    st.session_state['role'] = ''
+# 🔐 --- ระบบ Authentication & Session State (อัปเกรดจำรหัสด้วย Cookie) --- 🔐
+# สร้างตัวจัดการ Cookie
+@st.cache_resource
+def get_cookie_manager():
+    return stx.CookieManager()
 
-# ถ้ายังไม่ได้ล็อกอิน ให้โชว์หน้า Login ปิดทางเข้า
-# 2. หน้าต่าง Login (ถ้ายังไม่ได้ล็อกอิน ให้โชว์หน้านี้และหยุดการทำงานโค้ดด้านล่างทั้งหมด)
+cookie_manager = get_cookie_manager()
+
+# 1. เช็คว่ามี Cookie เก่าที่เคยล็อกอินค้างไว้ในเบราว์เซอร์ไหม
+if cookie_manager.get(cookie="logged_in") == "true":
+    st.session_state['logged_in'] = True
+    st.session_state['username'] = cookie_manager.get(cookie="username")
+    st.session_state['role'] = cookie_manager.get(cookie="role")
+else:
+    if 'logged_in' not in st.session_state:
+        st.session_state['logged_in'] = False
+        st.session_state['username'] = ''
+        st.session_state['role'] = ''
+
+# 2. หน้าต่าง Login
 if not st.session_state['logged_in']:
     st.markdown("<h1 style='text-align: center; color: #008080;'>🔐 Sensor Team Login</h1>", unsafe_allow_html=True)
     st.markdown("---")
@@ -49,26 +59,30 @@ if not st.session_state['logged_in']:
                 if input_user and input_pass:
                     with st.spinner("กำลังตรวจสอบข้อมูล..."):
                         try:
-                            # โหลดฐานข้อมูลผู้ใช้งานจาก GSheet
                             df_users = load_sheet("Users_DB")
-                            
-                            # เคลียร์หัวคอลัมน์และลบช่องว่าง
                             df_users.columns = [str(c).replace('\n', '').strip() for c in df_users.columns]
                             
                             if 'Username' in df_users.columns and 'Password' in df_users.columns:
                                 df_users['Username'] = df_users['Username'].astype(str).str.strip()
                                 df_users['Password'] = df_users['Password'].astype(str).str.strip()
                                 
-                                # เช็ค Username และ Password
                                 user_record = df_users[(df_users['Username'] == input_user.strip()) & (df_users['Password'] == input_pass.strip())]
                                 
                                 if not user_record.empty:
                                     status = str(user_record.iloc[0].get('Status', '')).strip()
                                     if status.lower() == 'approved':
+                                        # 🌟 ล็อกอินสำเร็จ -> บันทึกข้อมูลลง Cookie ให้จำค่า!
+                                        cookie_manager.set("logged_in", "true")
+                                        cookie_manager.set("username", input_user.strip())
+                                        cookie_manager.set("role", str(user_record.iloc[0].get('Role', 'user')).strip())
+                                        
                                         st.session_state['logged_in'] = True
                                         st.session_state['username'] = input_user.strip()
                                         st.session_state['role'] = str(user_record.iloc[0].get('Role', 'user')).strip()
-                                        st.rerun() # รีเฟรชหน้าเพื่อเข้าแอป
+                                        
+                                        st.success("เข้าสู่ระบบสำเร็จ! กรุณารอสักครู่...")
+                                        time.sleep(1) # ให้เวลาเบราว์เซอร์กลืน Cookie แป๊บนึง
+                                        st.rerun() 
                                     else:
                                         st.error("⚠️ บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบอนุมัติครับ")
                                 else:
@@ -80,10 +94,8 @@ if not st.session_state['logged_in']:
                 else:
                     st.warning("กรุณากรอกข้อมูลให้ครบถ้วน")
         
-        # ใส่ลิงก์ Google Form สำหรับลงทะเบียน
         st.markdown("<br><center>ยังไม่มีบัญชีผู้ใช้งาน? <a href='https://docs.google.com/forms/d/e/1FAIpQLSeqVZReF49TvuHi7aIr__TMM0_7x4771PF7cg_VXpO1lyQjHw/viewform' target='_blank'>คลิกที่นี่เพื่อลงทะเบียน</a></center>", unsafe_allow_html=True)
     
-    # 🛑 คำสั่ง st.stop() จะช่วยหยุดไม่ให้รันโค้ดด้านล่างถ้ายังไม่ได้ล็อกอิน
     st.stop()
 # =========================================================
 # 🎉 2. ส่วนแสดงเมนูเมื่อ Login ผ่าน (Role-based Access)
@@ -123,9 +135,14 @@ st.sidebar.info(f"👨‍💻 เข้าสู่ระบบโดย: **{CUR
 
 # ปุ่ม Logout
 if st.sidebar.button("🚪 ออกจากระบบ", use_container_width=True):
+    cookie_manager.delete("logged_in")
+    cookie_manager.delete("username")
+    cookie_manager.delete("role")
+    
     st.session_state['logged_in'] = False
     st.session_state['username'] = ''
     st.session_state['role'] = ''
+    time.sleep(1) # ให้เวลาลบ Cookie นิดนึง
     st.rerun()
 
 # --- 4. โครงสร้างแต่ละเมนู (โค้ด Dashboard ที่เหลือของคุณ Heart จะต่อจากตรงนี้ลงไปเหมือนเดิมครับ) ---
