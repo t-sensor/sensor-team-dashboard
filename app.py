@@ -12,6 +12,22 @@ import re
 
 def check_password_strength(password):
     """ตรวจสอบว่ารหัสผ่านแข็งแกร่งพอไหม"""
+    def send_line_message(message):
+    token = st.secrets["LINE_CHANNEL_TOKEN"]
+    group_id = st.secrets["LINE_GROUP_ID"]
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "to": group_id,
+        "messages": [{"type": "text", "text": message}]
+    }
+    requests.post(
+        "https://api.line.me/v2/bot/message/push",
+        headers=headers,
+        data=json.dumps(payload)
+    )
     errors = []
     
     if len(password) < 8:
@@ -457,6 +473,22 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                     st.dataframe(my_tasks[available_cols], use_container_width=True, hide_index=True)
                 else:
                     st.success("🎉 ตอนนี้คุณไม่มีงานค้างเลยครับ พักผ่อนได้!")
+                    if response.json().get("status") == "success":
+    st.success(f"บันทึกงาน '{task_detail}' สำเร็จ! 🎉")
+    
+    # ✅ เพิ่มตรงนี้
+    send_line_message(
+        f"🔔 งานใหม่เข้าระบบ!\n"
+        f"━━━━━━━━━━━━━\n"
+        f"👤 ผู้แจ้ง: {CURRENT_USER}\n"
+        f"🏢 ไซต์: {final_site_name}\n"
+        f"📋 งาน: {task_detail}\n"
+        f"👷 ผู้รับผิดชอบ: {assignee}\n"
+        f"📅 วันเข้าทำ: {start_date.strftime('%d/%m/%Y')}"
+    )
+    
+    st.cache_data.clear()
+    st.rerun()
             else:
                 st.error("⚠️ หาหัวคอลัมน์ 'ผู้รับผิดชอบหลัก' หรือ 'ผู้ช่วย' ไม่เจอครับ")
                 st.write("ชื่อคอลัมน์ที่ระบบอ่านได้จาก GSheet คือ:", df_tasks.columns.tolist())
