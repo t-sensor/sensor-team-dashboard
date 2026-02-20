@@ -149,7 +149,7 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
         df_master = load_sheet("Master_Site")
         site_list = df_master['ชื่อไซต์งาน (Process Work)'].dropna().unique().tolist()
         
-        # ตรวจสอบการนำทางมาจากหน้า Dashboard (ถ้ามี)
+        # ตรวจสอบการนำทางมาจากหน้า Dashboard
         default_index = 0
         if 'selected_site_from_dashboard' in st.session_state:
             requested_site = st.session_state.selected_site_from_dashboard
@@ -167,7 +167,6 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
             try:
                 df_pm = load_sheet("PM_Plan")
                 st.dataframe(df_pm, use_container_width=True, hide_index=True)
-                st.info("💡 เลื่อนแถบด้านล่างตารางไปทางขวา เพื่อดูเดือนอื่นๆ ได้เลยครับ")
             except Exception as e:
                 st.error(f"ไม่สามารถโหลดข้อมูลแผน PM รวมได้: {e}")
                 
@@ -175,51 +174,48 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
             st.subheader(f"📍 ข้อมูลสรุปของไซต์: {selected_site}")
             tab1, tab2, tab3 = st.tabs(["🗓️ แผน PM (PM Plan)", "📡 อุปกรณ์ (Assets)", "🚨 ประวัติปัญหา (Issue Log)"])
             
-            # --- Tab 1: แผนงานประจำปี (สกัดมาแค่ 4 ครั้ง) ---
+            # --- Tab 1: แผนงานประจำปี (4 ครั้ง + วันที่ซิม) ---
             with tab1:
                 try:
                     df_pm = load_sheet("PM_Plan")
                     df_pm.columns = [str(c).strip() for c in df_pm.columns]
+                    site_pm = df_pm[df_pm['ชื่อไซต์งาน'] == selected_site]
                     
-                    if 'ชื่อไซต์งาน' in df_pm.columns:
-                        site_pm = df_pm[df_pm['ชื่อไซต์งาน'] == selected_site]
-                        if not site_pm.empty:
-                            row_data = site_pm.iloc[0]
-                            
-                            # 🛠️ แยกเฉพาะรอบการ PM 4 ครั้ง
-                            pm_cols = ['PM ใหญ่', 'PM ย่อย ครั้งที่ 1', 'PM ย่อย ครั้งที่ 2', 'PM ย่อย ครั้งที่ 3']
-                            pm_schedule = []
-                            pm_count = 0
-                            
-                            for col in pm_cols:
-                                if col in site_pm.columns:
-                                    val = str(row_data[col]).strip()
-                                    if val and val.lower() != 'nan' and val != '-':
-                                        pm_schedule.append({"รอบการทำงาน": col, "กำหนดการ (เดือน_สัปดาห์)": val})
-                                        pm_count += 1
-                            
-                            # แสดงจำนวนครั้งที่ถูกต้อง (สูงสุด 4 ครั้ง)
-                            st.success(f"📌 ไซต์นี้มีกำหนดเข้าทำ PM จำนวน {pm_count} ครั้ง ดังนี้ครับ:")
-                            if pm_schedule:
-                                st.table(pd.DataFrame(pm_schedule))
-                            
-                            # 📶 แยกแสดงวันที่ซิมหมดอายุออกมาต่างหาก
-                            if 'วันที่ซิมหมดอายุ' in site_pm.columns:
-                                sim_date = str(row_data['วันที่ซิมหมดอายุ']).strip()
-                                if sim_date and sim_date.lower() != 'nan' and sim_date != '-':
-                                    st.warning(f"📶 **วันที่ซิมหมดอายุ:** {sim_date}")
-                            
-                            # ปุ่มบันทึกสถานะ PM (ถ้ามีระบบอัปเดต)
-                            st.markdown("---")
-                            if st.button(f"✅ บันทึกว่า {selected_site} ทำ PM รอบนี้เสร็จแล้ว", type="primary"):
-                                payload = {"action": "update_pm_status", "sheet": "PM_Plan", "siteName": selected_site, "status": "PM แล้ว"}
-                                with st.spinner("กำลังส่งข้อมูล..."):
+                    if not site_pm.empty:
+                        row_data = site_pm.iloc[0]
+                        pm_cols = ['PM ใหญ่', 'PM ย่อย ครั้งที่ 1', 'PM ย่อย ครั้งที่ 2', 'PM ย่อย ครั้งที่ 3']
+                        pm_schedule = []
+                        pm_count = 0
+                        
+                        for col in pm_cols:
+                            if col in site_pm.columns:
+                                val = str(row_data[col]).strip()
+                                if val and val.lower() != 'nan' and val != '-':
+                                    pm_schedule.append({"รอบการทำงาน": col, "กำหนดการ (เดือน_สัปดาห์)": val})
+                                    pm_count += 1
+                        
+                        st.success(f"📌 ไซต์นี้มีกำหนดเข้าทำ PM จำนวน {pm_count} ครั้ง ดังนี้ครับ:")
+                        if pm_schedule:
+                            st.table(pd.DataFrame(pm_schedule))
+                        
+                        # วันที่ซิมหมดอายุ (แยกออกมาเป็นแถบเตือน)
+                        if 'วันที่ซิมหมดอายุ' in site_pm.columns:
+                            sim_date = str(row_data['วันที่ซิมหมดอายุ']).strip()
+                            if sim_date and sim_date.lower() != 'nan' and sim_date != '-':
+                                st.warning(f"📶 **วันที่ซิมหมดอายุ:** {sim_date}")
+                        
+                        # ปุ่มบันทึกผล (Red Primary Button)
+                        st.markdown("---")
+                        if st.button(f"✅ บันทึกว่า {selected_site} ทำ PM รอบนี้เสร็จแล้ว", type="primary"):
+                            payload = {"action": "update_pm_status", "sheet": "PM_Plan", "siteName": selected_site, "status": "PM แล้ว"}
+                            with st.spinner("กำลังส่งข้อมูลอัปเดตไปยังระบบ Dashboard..."):
+                                try:
                                     res = requests.post(GAS_URL, data=json.dumps(payload))
                                     if res.json().get("status") == "success":
-                                        st.success("อัปเดตสถานะสำเร็จ!")
+                                        st.success("🎉 บันทึกสำเร็จ! ไซต์นี้จะแสดงเป็น 'สีเขียว' ในหน้า Dashboard แล้วครับ")
                                         st.cache_data.clear()
-                        else:
-                            st.warning("ไม่พบข้อมูลในแผน PM")
+                                except:
+                                    st.error("การเชื่อมต่อขัดข้อง กรุณาลองอีกครั้ง")
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
                     
@@ -228,45 +224,55 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
                 try:
                     df_assets = load_sheet("Asset_Sensor")
                     df_assets.columns = [str(c).strip() for c in df_assets.columns]
-                    if not df_assets.empty and 'ชื่อไซต์งาน' in df_assets.columns:
-                        site_assets = df_assets[df_assets['ชื่อไซต์งาน'] == selected_site]
+                    
+                    # ค้นหาคอลัมน์ชื่อไซต์งานอัตโนมัติ (เผื่อชื่อไม่ตรงเป๊ะ)
+                    site_col_assets = next((c for c in df_assets.columns if "ไซต์" in c or "Site" in c), None)
+                    
+                    if site_col_assets:
+                        site_assets = df_assets[df_assets[site_col_assets] == selected_site]
                         if not site_assets.empty:
-                            st.dataframe(site_assets.drop(columns=['ชื่อไซต์งาน']), use_container_width=True, hide_index=True)
+                            st.dataframe(site_assets.drop(columns=[site_col_assets]), use_container_width=True, hide_index=True)
                         else:
-                            st.info("ยังไม่มีข้อมูลอุปกรณ์")
+                            st.info(f"ยังไม่มีข้อมูลอุปกรณ์เซ็นเซอร์ในฐานข้อมูลสำหรับไซต์ {selected_site}")
+                    else:
+                        st.warning("⚠️ ไม่พบคอลัมน์ 'ชื่อไซต์งาน' ในแผ่น Asset_Sensor")
                 except:
-                    st.warning("ระบบกำลังรอตาราง Asset_Sensor")
+                    st.warning("กำลังรอการเชื่อมต่อแผ่น Asset_Sensor...")
                     
-            # --- Tab 3: ประวัติปัญหา ---
+            # --- Tab 3: ประวัติปัญหา (Issue Log) ---
             with tab3:
-                # 📝 ส่วนที่เพิ่มใหม่: ดึงข้อมูลจากคอลัมน์ "หมายเหตุ" ของแผ่น PM_Plan
+                has_any_data = False # ตัวแปรเช็คว่ามีข้อมูลโชว์หรือยัง
+                
+                # 1. ดึงหมายเหตุจาก PM_Plan
                 try:
-                    df_pm = load_sheet("PM_Plan")
-                    df_pm.columns = [str(c).strip() for c in df_pm.columns]
-                    site_note_row = df_pm[df_pm['ชื่อไซต์งาน'] == selected_site]
+                    df_pm_note = load_sheet("PM_Plan")
+                    df_pm_note.columns = [str(c).strip() for c in df_pm_note.columns]
+                    site_note_row = df_pm_note[df_pm_note['ชื่อไซต์งาน'] == selected_site]
                     
-                    if not site_note_row.empty and 'หมายเหตุ' in df_pm.columns:
+                    if not site_note_row.empty and 'หมายเหตุ' in df_pm_note.columns:
                         note_val = str(site_note_row.iloc[0]['หมายเหตุ']).strip()
                         if note_val and note_val.lower() != 'nan' and note_val != '-':
                             st.info("📝 **หมายเหตุจากแผนงาน (PM Plan Note):**")
                             st.write(note_val)
                             st.markdown("---")
-                except:
-                    pass
+                            has_any_data = True
+                except: pass
 
-                # ส่วนดึงประวัติปัญหาจาก Task & Workload เดิม
+                # 2. ดึงประวัติงานจาก Task & Workload
                 try:
                     df_tasks = load_sheet("Task & Workload")
                     df_tasks.columns = [str(c).strip() for c in df_tasks.columns]
-                    if not df_tasks.empty and 'ชื่อไซต์งาน' in df_tasks.columns:
+                    if 'ชื่อไซต์งาน' in df_tasks.columns:
                         site_tasks = df_tasks[df_tasks['ชื่อไซต์งาน'] == selected_site]
                         if not site_tasks.empty:
                             st.markdown("🔍 **ประวัติการทำงานและปัญหาที่พบ:**")
                             st.dataframe(site_tasks.drop(columns=['ชื่อไซต์งาน']), use_container_width=True, hide_index=True)
-                        else:
-                            st.success("🎉 ยังไม่เคยพบปัญหาร้ายแรงในไซต์นี้")
-                except:
-                    st.warning("ระบบกำลังรอตาราง Task & Workload")
+                            has_any_data = True
+                except: pass
+
+                # 3. ถ้าไม่มีข้อมูลเลยจริงๆ ค่อยโชว์แถบสีเขียว
+                if not has_any_data:
+                    st.success("🎉 ยังไม่เคยพบปัญหาร้ายแรงในไซต์นี้")
 
     except Exception as e:
         st.error(f"ระบบขัดข้อง: {e}")
