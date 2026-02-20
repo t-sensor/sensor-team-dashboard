@@ -39,6 +39,7 @@ def send_line_message(message):
         "https://api.line.me/v2/bot/message/push",
         headers=headers,
         data=json.dumps(payload)
+    )
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
@@ -544,26 +545,24 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                 with st.spinner("กำลังส่งข้อมูลเข้าตาราง..."):
                     try:
                         response = requests.post(GAS_URL, data=json.dumps(payload))
+# ✅ แก้เป็นแบบนี้ (ต้องเยื้องให้อยู่ใน if)
                         if response.json().get("status") == "success":
-    st.success(f"บันทึกงาน '{task_detail}' ที่ '{final_site_name}' สำเร็จ! 🎉")
-    
-    # ✅ เพิ่มตรงนี้
-    send_line_message(
-        f"🔔 งานใหม่เข้าระบบ!\n"
-        f"━━━━━━━━━━━━━\n"
-        f"👤 ผู้แจ้ง: {CURRENT_USER}\n"
-        f"🏢 ไซต์: {final_site_name}\n"
-        f"📋 งาน: {task_detail}\n"
-        f"🏷️ ประเภท: {task_type}\n"
-        f"📌 สถานะ: {status}\n"
-        f"📅 วันเข้าทำ: {start_date.strftime('%d/%m/%Y')}\n"
-        f"⏰ กำหนดเสร็จ: {end_date.strftime('%d/%m/%Y')}\n"
-        f"👷 ผู้รับผิดชอบ: {assignee}\n"
-        f"🤝 ผู้ช่วย: {assistants_str if assistants_str else '-'}"
-    )
-    
-    st.cache_data.clear()
-    st.rerun()
+                            st.success(f"บันทึกงาน '{task_detail}' ที่ '{final_site_name}' สำเร็จ! 🎉")
+                            send_line_message(
+                                f"🔔 งานใหม่เข้าระบบ!\n"
+                                f"━━━━━━━━━━━━━\n"
+                                f"👤 ผู้แจ้ง: {CURRENT_USER}\n"
+                                f"🏢 ไซต์: {final_site_name}\n"
+                                f"📋 งาน: {task_detail}\n"
+                                f"🏷️ ประเภท: {task_type}\n"
+                                f"📌 สถานะ: {status}\n"
+                                f"📅 วันเข้าทำ: {start_date.strftime('%d/%m/%Y')}\n"
+                                f"⏰ กำหนดเสร็จ: {end_date.strftime('%d/%m/%Y')}\n"
+                                f"👷 ผู้รับผิดชอบ: {assignee}\n"
+                                f"🤝 ผู้ช่วย: {assistants_str if assistants_str else '-'}"
+                            )
+                            st.cache_data.clear()
+                            st.rerun()
                     except Exception as e:
                         st.error(f"ระบบขัดข้อง: {e}")
             else:
