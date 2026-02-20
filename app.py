@@ -12,7 +12,19 @@ import re
 
 def check_password_strength(password):
     """ตรวจสอบว่ารหัสผ่านแข็งแกร่งพอไหม"""
-    def send_line_message(message):
+    errors = []
+    
+    if len(password) < 8:
+        errors.append("❌ ความยาวต้องมีอย่างน้อย 8 ตัวอักษร")
+    if not re.search(r'[A-Za-z]', password):
+        errors.append("❌ ต้องมีตัวอักษรภาษาอังกฤษอย่างน้อย 1 ตัว")
+    if not re.search(r'[0-9]', password):
+        errors.append("❌ ต้องมีตัวเลขอย่างน้อย 1 ตัว")
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=/\\]', password):
+        errors.append("❌ ต้องมีอักขระพิเศษ เช่น !@#$% อย่างน้อย 1 ตัว")
+    
+    return errors
+def send_line_message(message):
     token = st.secrets["LINE_CHANNEL_TOKEN"]
     group_id = st.secrets["LINE_GROUP_ID"]
     headers = {
@@ -27,19 +39,6 @@ def check_password_strength(password):
         "https://api.line.me/v2/bot/message/push",
         headers=headers,
         data=json.dumps(payload)
-    )
-    errors = []
-    
-    if len(password) < 8:
-        errors.append("❌ ความยาวต้องมีอย่างน้อย 8 ตัวอักษร")
-    if not re.search(r'[A-Za-z]', password):
-        errors.append("❌ ต้องมีตัวอักษรภาษาอังกฤษอย่างน้อย 1 ตัว")
-    if not re.search(r'[0-9]', password):
-        errors.append("❌ ต้องมีตัวเลขอย่างน้อย 1 ตัว")
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=/\\]', password):
-        errors.append("❌ ต้องมีอักขระพิเศษ เช่น !@#$% อย่างน้อย 1 ตัว")
-    
-    return errors
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
 
@@ -473,22 +472,6 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                     st.dataframe(my_tasks[available_cols], use_container_width=True, hide_index=True)
                 else:
                     st.success("🎉 ตอนนี้คุณไม่มีงานค้างเลยครับ พักผ่อนได้!")
-                    if response.json().get("status") == "success":
-    st.success(f"บันทึกงาน '{task_detail}' สำเร็จ! 🎉")
-    
-    # ✅ เพิ่มตรงนี้
-    send_line_message(
-        f"🔔 งานใหม่เข้าระบบ!\n"
-        f"━━━━━━━━━━━━━\n"
-        f"👤 ผู้แจ้ง: {CURRENT_USER}\n"
-        f"🏢 ไซต์: {final_site_name}\n"
-        f"📋 งาน: {task_detail}\n"
-        f"👷 ผู้รับผิดชอบ: {assignee}\n"
-        f"📅 วันเข้าทำ: {start_date.strftime('%d/%m/%Y')}"
-    )
-    
-    st.cache_data.clear()
-    st.rerun()
             else:
                 st.error("⚠️ หาหัวคอลัมน์ 'ผู้รับผิดชอบหลัก' หรือ 'ผู้ช่วย' ไม่เจอครับ")
                 st.write("ชื่อคอลัมน์ที่ระบบอ่านได้จาก GSheet คือ:", df_tasks.columns.tolist())
@@ -562,9 +545,25 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                     try:
                         response = requests.post(GAS_URL, data=json.dumps(payload))
                         if response.json().get("status") == "success":
-                            st.success(f"บันทึกงาน '{task_detail}' ที่ '{final_site_name}' สำเร็จ! 🎉")
-                            st.cache_data.clear() # เคลียร์แคชเพื่อให้ตารางอัปเดตงานใหม่ทันที
-                            st.rerun() # รีเฟรชหน้าเว็บทันที
+    st.success(f"บันทึกงาน '{task_detail}' ที่ '{final_site_name}' สำเร็จ! 🎉")
+    
+    # ✅ เพิ่มตรงนี้
+    send_line_message(
+        f"🔔 งานใหม่เข้าระบบ!\n"
+        f"━━━━━━━━━━━━━\n"
+        f"👤 ผู้แจ้ง: {CURRENT_USER}\n"
+        f"🏢 ไซต์: {final_site_name}\n"
+        f"📋 งาน: {task_detail}\n"
+        f"🏷️ ประเภท: {task_type}\n"
+        f"📌 สถานะ: {status}\n"
+        f"📅 วันเข้าทำ: {start_date.strftime('%d/%m/%Y')}\n"
+        f"⏰ กำหนดเสร็จ: {end_date.strftime('%d/%m/%Y')}\n"
+        f"👷 ผู้รับผิดชอบ: {assignee}\n"
+        f"🤝 ผู้ช่วย: {assistants_str if assistants_str else '-'}"
+    )
+    
+    st.cache_data.clear()
+    st.rerun()
                     except Exception as e:
                         st.error(f"ระบบขัดข้อง: {e}")
             else:
