@@ -114,11 +114,13 @@ if raw:
 
 # 3. หน้าต่าง Login
 if not st.session_state['logged_in']:
-    st.markdown("<h1 style='text-align: center; color: #008080;'>🔐 Sensor Team Login</h1>", unsafe_allow_html=True)
-    st.markdown("---")
-    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
+        # 🌟 เพิ่มโลโก้ทีมตรงนี้ (ปรับตัวเลข width เพื่อย่อ/ขยายขนาดรูปได้ครับ)
+        st.image("logo.png", width=250) 
+        
+        st.markdown("<h1 style='text-align: center; color: #008080;'>🔐 Sensor Team Login</h1>", unsafe_allow_html=True)
+        st.markdown("---")
         st.info("กรุณาเข้าสู่ระบบ หากยังไม่มีรหัส กรุณาลงทะเบียนและรออนุมัติ")
         with st.form("login_form"):
             input_user = st.text_input("👤 Username")
