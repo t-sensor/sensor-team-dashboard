@@ -87,7 +87,20 @@ def load_sheet(sheet_name):
         keep_default_na=False,  # 👈 ห้าม Pandas แปลงค่าเป็น NaN เอง
         na_values=['']          # 👈 ถือว่า NaN ก็แค่เซลล์ว่างเท่านั้น
     )
-
+# 📝 ฟังก์ชันบันทึกประวัติเข้า-ออกเว็บ
+def log_user_action(username, action):
+    try:
+        payload = {
+            "sheet": "Login_Logs",
+            "data": [
+                (pd.Timestamp.utcnow() + pd.Timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S"),
+                username,
+                action
+            ]
+        }
+        requests.post(GAS_URL, data=json.dumps(payload))
+    except:
+        pass
 # =========================================================
 # 🔐 ระบบตรวจสอบการ Login (จำรหัสด้วย Local Storage)
 # =========================================================
@@ -114,7 +127,34 @@ if raw:
         pass
 
 # 3. หน้าต่าง Login
-# 3. หน้าต่าง Login
+# =========================================================
+# ⏱️ ระบบตรวจสอบเวลาหมดอายุ (Session Timeout - 30 นาที)
+# =========================================================
+if st.session_state.get('logged_in'):
+    import time
+    current_time = time.time()
+    # ถ้าพิ่งล็อกอินครั้งแรก ให้ตั้งค่าเวลาเริ่มต้นเป็นปัจจุบัน
+    last_active = st.session_state.get('last_active', current_time)
+    
+    # ถ้าเวลาปัจจุบัน - เวลาล่าสุดที่ขยับ มากกว่า 1800 วินาที (30 นาที)
+    if current_time - last_active > 1800:
+        # 1. แอบบันทึกประวัติว่าโดนเตะออกเพราะหมดเวลา
+        log_user_action(st.session_state.get('username', 'Unknown'), "Auto-Logout (Timeout)")
+        
+        # 2. ล้างความจำเบราว์เซอร์และ Session
+        localS.deleteAll()
+        st.session_state['logged_in'] = False
+        st.session_state['username'] = ''
+        st.session_state['role'] = ''
+        
+        # 3. แจ้งเตือนแล้วรีเฟรชหน้า
+        st.error("⏱️ คุณไม่ได้ใช้งานระบบเกิน 30 นาที ระบบได้ทำการลงชื่อออกอัตโนมัติเพื่อความปลอดภัยครับ")
+        time.sleep(3)
+        st.rerun()
+    else:
+        # ถ้ายังไม่ถึง 30 นาที และมีการกดใช้งานเว็บ ให้อัปเดตเวลาล่าสุด
+        st.session_state['last_active'] = current_time
+
 if not st.session_state['logged_in']:
     st.markdown("<br><br>", unsafe_allow_html=True) # ดันให้ฟอร์มลงมากลางจออีกนิด
     
@@ -169,8 +209,12 @@ if not st.session_state['logged_in']:
                                         st.session_state['username'] = input_user.strip()
                                         st.session_state['role'] = role_val
                                         
+                                        # 🌟 แทรกบรรทัดนี้ลงไปตรงนี้ครับ
+                                        log_user_action(input_user.strip(), "Login")
+                                        
                                         st.success("เข้าสู่ระบบสำเร็จ! กรุณารอสักครู่...")
                                         time.sleep(1)
+                                        
                                         st.rerun() 
                                     else:
                                         st.error("⚠️ บัญชีของคุณอยู่ระหว่างรอผู้ดูแลระบบอนุมัติครับ")
@@ -193,14 +237,17 @@ CURRENT_USER = st.session_state['username']
 CURRENT_ROLE = st.session_state['role'].lower()
 
 # --- 3. สร้างระบบเมนูแถบด้านข้าง (Sidebar) ตามสิทธิ์ ---
-# 🌟 เพิ่มโลโก้ไว้บนสุดของแถบด้านซ้าย
-st.sidebar.image("logo.png", use_container_width=True) 
+# --- 3. สร้างระบบเมนูแถบด้านข้าง (Sidebar) ตามสิทธิ์ ---
+# 🌟 ใส่โลโก้ด้านบนสุดของ Sidebar
+try:
+    st.sidebar.image("logo.png", use_container_width=True) 
+except:
+    pass # ถ้าหารูปไม่เจอให้ข้ามไปก่อน
 
 st.sidebar.title("🛠️ Sensor Team Menu")
 
 # เช็คสิทธิ์ (Admin กับ Member เห็นทุกอย่าง / User เห็นแค่บางเมนู)
 if CURRENT_ROLE in ['admin', 'member']:
-# ... (โค้ดเมนูเดิม) ...
     menu_options = [
         "🏠 1. ภาพรวมและสถิติ (Dashboard)",
         "🏢 2. เจาะลึกรายไซต์ (Site Detail)",
@@ -212,7 +259,6 @@ if CURRENT_ROLE in ['admin', 'member']:
         "📚 8. คู่มือการใช้งาน (Manuals & Docs)"
     ]
 else:
-    # สิทธิ์ระดับ user (ลูกค้า/ภายนอก) ดูได้แค่หน้าเหล่านี้ (ปรับแก้ได้ตามต้องการครับ)
     menu_options = [
         "🏠 1. ภาพรวมและสถิติ (Dashboard)",
         "🏢 2. เจาะลึกรายไซต์ (Site Detail)",
@@ -222,23 +268,50 @@ else:
 menu = st.sidebar.radio("เลือกเมนูการใช้งาน:", menu_options)
 
 st.sidebar.markdown("---")
+
 # โชว์ป้ายชื่อและตำแหน่งสุดเท่
 role_color = "🟢" if CURRENT_ROLE == 'admin' else ("🔵" if CURRENT_ROLE == 'member' else "⚪")
 st.sidebar.info(f"👨‍💻 เข้าสู่ระบบโดย: **{CURRENT_USER}**\n\n{role_color} ระดับสิทธิ์: {CURRENT_ROLE.upper()}")
 
-# ปุ่ม Logout
-# ปุ่ม Logout
-if st.sidebar.button("🚪 ออกจากระบบ", use_container_width=True):
-    # ล้างความจำในเบราว์เซอร์
+# 🌟 โชว์สถานะคนออนไลน์ (เห็นเฉพาะ Admin)
+if CURRENT_ROLE == 'admin':
+    st.sidebar.markdown("**📡 สถานะทีมงาน (Online)**")
+    try:
+        df_logs = load_sheet("Login_Logs")
+        if not df_logs.empty:
+            df_logs.columns = [str(c).strip() for c in df_logs.columns]
+            last_status = df_logs.drop_duplicates(subset=['Username'], keep='last')
+            online_users = last_status[last_status['Action'] == 'Login']
+            
+            if not online_users.empty:
+                for _, r in online_users.iterrows():
+                    time_only = str(r['Timestamp']).split(' ')[1][:5]
+                    st.sidebar.caption(f"🟢 **{r['Username']}** (เข้าเมื่อ {time_only})")
+            else:
+                st.sidebar.caption("⚪ ไม่มีผู้ใช้ออนไลน์")
+    except:
+        st.sidebar.caption("รอโหลดข้อมูล...")
+
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
+
+# 🌟 ปุ่ม Logout (กดแล้วบันทึกประวัติและเตะออก)
+if st.sidebar.button("🚪 ออกจากระบบ", type="primary", use_container_width=True):
+    # บันทึกประวัติ
+    log_user_action(st.session_state['username'], "Logout")
+    
+    # ล้างความจำเบราว์เซอร์
     localS.deleteAll()
     
+    # เคลียร์ Session
     st.session_state['logged_in'] = False
     st.session_state['username'] = ''
     st.session_state['role'] = ''
+    
+    # รีเฟรชเว็บ
     time.sleep(1)
     st.rerun()
 
-# --- 4. โครงสร้างแต่ละเมนู (โค้ด Dashboard ที่เหลือของคุณ Heart จะต่อจากตรงนี้ลงไปเหมือนเดิมครับ) ---
+# --- 4. โครงสร้างแต่ละเมนู (โค้ด Dashboard ของเดิมจะต่อจากตรงนี้ลงไป) ---
 # --- ส่วนที่ 1: Dashboard อัจฉริยะ (เมนู 1) ---
 if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
     st.title("📊 Team Sensor Command Center")
@@ -811,7 +884,6 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
     borrowed_stock = {}  # เก็บของที่ถูกยืมไปแล้ว
     
     try:
-        # โหลดคลังหลัก (Master_Equipment)
         df_equip = load_sheet("Master_Equipment")
         if 'Equipment' in df_equip.columns and 'Volume' in df_equip.columns:
             for _, row in df_equip.iterrows():
@@ -819,21 +891,16 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
                 volume = pd.to_numeric(row['Volume'], errors='coerce')
                 if pd.notna(volume) and tool_name != "nan":
                     total_stock[tool_name] = int(volume)
-                    borrowed_stock[tool_name] = 0 # ตั้งค่าเริ่มต้นของถูกยืมเป็น 0
+                    borrowed_stock[tool_name] = 0
                     
-        # โหลดประวัติการยืม (Team_Tools) เพื่อหาของที่หายไปจากคลัง
         df_tools = load_sheet("Team_Tools")
         if not df_tools.empty:
             df_tools.columns = [str(c).strip() for c in df_tools.columns]
-            # ตรวจสอบว่ามีคอลัมน์ใหม่ไหม (ถ้ายังไม่มี ให้ตีความว่าบรรทัดนั้นยืม 1 ชิ้น)
             has_qty_col = 'จำนวน' in df_tools.columns
             
             for _, row in df_tools.iterrows():
-                # อิงตามคอลัมน์: 1=ผู้เบิก, 2=อุปกรณ์, 3=ไซต์, 4=สถานะ
                 hist_tool = str(row.iloc[2]).strip()
                 hist_status = str(row.iloc[4]).strip()
-                
-                # ดึงจำนวน (ถ้าไม่มีคอลัมน์ให้ใส่ 1)
                 qty = float(row['จำนวน']) if has_qty_col and pd.notna(row.get('จำนวน')) else 1.0
                 
                 if hist_tool in borrowed_stock:
@@ -852,7 +919,7 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
     for tool, total in total_stock.items():
         if total > 0:
             remaining = int(total - borrowed_stock[tool])
-            if remaining < 0: remaining = 0 # ป้องกันติดลบ
+            if remaining < 0: remaining = 0 
             
             display_text = f"{tool} (เหลือ {remaining}/{total})"
             tool_options_display.append(display_text)
@@ -860,19 +927,35 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
 
     # --- ส่วนที่ 1: ฟอร์มเบิก/คืน ---
     st.markdown("### 📝 ฟอร์มทำรายการ")
-    with st.form("tools_form"):
+    
+    # 🌟 อัปเกรดเป็น st.container เพื่อให้โต้ตอบได้ทันที (Interactive)
+    with st.container(border=True):
         col1, col2 = st.columns(2)
         with col2:
             status = st.radio("📌 สถานะการทำรายการ", ["🔴 ยืมอุปกรณ์ (Borrow)", "🟢 คืนอุปกรณ์ (Return)"], horizontal=True)
             site_used = st.selectbox("📍 นำไปใช้ที่ไซต์งาน", ["ส่วนกลาง / ออฟฟิศ"] + site_list)
             
         with col1:
-            borrower = st.selectbox("👤 ชื่อผู้เบิก/คืน", team_members)
-            selected_displays = st.multiselect("🔧 เลือกอุปกรณ์ (กดเลือกได้หลายชิ้น)", tool_options_display)
+            # 🌟 ทำให้ฉลาดขึ้น: ตั้งค่าเริ่มต้นเป็นชื่อคนที่ล็อกอินอยู่
+            try:
+                def_idx = team_members.index(CURRENT_USER)
+            except:
+                def_idx = 0
+            borrower = st.selectbox("👤 ชื่อผู้เบิก/คืน", team_members, index=def_idx)
+            
+            # 🌟 เพิ่มกล่องติ๊กถูก "เลือกทั้งหมด"
+            select_all = st.checkbox("☑️ เลือกอุปกรณ์ทั้งหมด (Select All)")
+            
+            if select_all:
+                # ถ้ากดติ๊ก ให้ยัดทุกอย่างลงไปในช่องเลือกอัตโนมัติ
+                selected_displays = st.multiselect("🔧 เลือกอุปกรณ์ (กดกากบาท ❌ เพื่อเอาบางชิ้นออกได้)", tool_options_display, default=tool_options_display)
+            else:
+                selected_displays = st.multiselect("🔧 เลือกอุปกรณ์ (กดเลือกได้หลายชิ้น)", tool_options_display)
         
-        # 📦 สร้างช่องกรอกจำนวน โผล่ขึ้นมาตามของที่กดเลือก!
+        # 📦 สร้างช่องกรอกจำนวน โผล่ขึ้นมาตามของที่กดเลือกแบบ Real-time
         quantities = {}
         if selected_displays:
+            st.markdown("---")
             st.markdown("**📦 ระบุจำนวนที่ต้องการทำรายการ:**")
             col_q1, col_q2 = st.columns(2)
             for i, display in enumerate(selected_displays):
@@ -880,14 +963,15 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
                 # สลับฝั่งซ้ายขวาให้ดูสวยงาม
                 with col_q1 if i % 2 == 0 else col_q2:
                     quantities[tool] = st.number_input(f"จำนวน: {tool}", min_value=1, step=1, key=f"qty_{tool}")
-            
-        submitted = st.form_submit_button("บันทึกข้อมูลเข้าคลัง", type="primary")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        # เปลี่ยนปุ่ม Submit ธรรมดา
+        submitted = st.button("บันทึกข้อมูลเข้าคลัง", type="primary", use_container_width=True)
         
         if submitted:
             if selected_displays:
                 with st.spinner("กำลังบันทึกข้อมูลเข้าทีละรายการ..."):
                     success_count = 0
-                    # ทำการวนลูปยิงข้อมูลเข้า GSheet ทีละอุปกรณ์ (เพื่อให้คอมพิวเตอร์นับเลขได้ง่าย)
                     for display in selected_displays:
                         tool = real_tool_names[display]
                         qty = quantities[tool]
@@ -898,7 +982,7 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
                                 (pd.Timestamp.utcnow() + pd.Timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S"),
                                 borrower, tool, site_used, 
                                 status.replace("🔴 ", "").replace("🟢 ", ""),
-                                qty # คอลัมน์ F: จำนวน
+                                qty
                             ]
                         }
                         try:
@@ -908,7 +992,10 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
                             pass
                             
                     if success_count == len(selected_displays):
-                        st.success(f"✅ บันทึก '{status}' จำนวน {success_count} รายการ เรียบร้อยแล้ว! (รีเฟรชเพื่อดูยอดคงเหลืออัปเดต)")
+                        st.success(f"✅ บันทึก '{status}' จำนวน {success_count} รายการ เรียบร้อยแล้ว!")
+                        st.cache_data.clear()
+                        time.sleep(1)
+                        st.rerun() # รีเฟรชหน้าเพื่ออัปเดตยอดคงเหลือ
                     else:
                         st.warning("บันทึกได้บางรายการ กรุณาตรวจสอบ GSheet")
             else:
@@ -922,9 +1009,11 @@ elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (T
         df_tools = load_sheet("Team_Tools")
         if not df_tools.empty:
             df_tools.columns = [str(c).strip() for c in df_tools.columns]
-            st.dataframe(df_tools, use_container_width=True, hide_index=True)
+            # แสดงจากล่างขึ้นบน (ล่าสุดอยู่บนสุด)
+            st.dataframe(df_tools.iloc[::-1], use_container_width=True, hide_index=True)
     except:
         st.info("ยังไม่มีประวัติการเบิกใช้อุปกรณ์ในระบบครับ")
+#หน้าที่6 --------------------------------------------------------------------------------
 elif menu == "👥 6. ข้อมูลทีม (Team Profile)":
     st.title("👥 ข้อมูลและศักยภาพทีม (Team Profile)")
     st.write("ทำเนียบสมาชิกทีม Sensor เพื่อดูความรับผิดชอบ ความเชี่ยวชาญ และใบรับรองของแต่ละบุคคล")
