@@ -688,6 +688,7 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                         st.error(f"ระบบขัดข้อง: {e}")
             else:
                 st.warning("⚠️ กรุณาระบุ 'ชื่อไซต์' และ 'รายละเอียดงาน'")
+#หน้าที่4 ---------------------------------------------------------------------------------------------
 elif menu == "📊 4. ภาพรวมงานของทีม (Team Manager)":
     st.title("📊 ภาพรวมงานของทีม (Team Workload)")
     st.write("ศูนย์บัญชาการสำหรับดูภาระงานของทุกคนในทีม เพื่อประกอบการตัดสินใจจ่ายงาน")
@@ -698,12 +699,21 @@ elif menu == "📊 4. ภาพรวมงานของทีม (Team Manage
         if not df_tasks.empty:
             df_tasks.columns = [str(c).strip() for c in df_tasks.columns]
             
+            # 🌟 ความอัจฉริยะที่เพิ่มเข้ามา: รวบงานที่ซ้ำกัน ให้เหลือเฉพาะ "สถานะล่าสุด" (บรรทัดล่างสุด) แบบเดียวกับเมนู 3
+            if 'ชื่อไซต์งาน' in df_tasks.columns and 'ชื่องาน / รายละเอียด' in df_tasks.columns:
+                df_latest_tasks = df_tasks.drop_duplicates(
+                    subset=['ชื่อไซต์งาน', 'ชื่องาน / รายละเอียด'], 
+                    keep='last'
+                )
+            else:
+                df_latest_tasks = df_tasks.copy()
+            
             # --- 📈 ส่วนที่ 1: กราฟสรุปภาระงาน (Workload) ---
             st.markdown("### 📈 ภาระงานรายบุคคล (เฉพาะงานหลักที่รับผิดชอบ)")
             
-            if 'ผู้รับผิดชอบหลัก' in df_tasks.columns:
-                # กรองเอางานที่เสร็จแล้วออกไปก่อน (เพื่อดูเฉพาะงานที่กำลังทำหรือติดปัญหา)
-                active_tasks = df_tasks[df_tasks['สถานะงาน'] != 'Complete']
+            if 'ผู้รับผิดชอบหลัก' in df_latest_tasks.columns:
+                # 🌟 กรองเอางานที่เสร็จแล้วออกไป (อ่านจาก df_latest_tasks ที่กรองประวัติซ้ำแล้ว)
+                active_tasks = df_latest_tasks[df_latest_tasks['สถานะงาน'] != 'Complete']
                 
                 # นับจำนวนงานของแต่ละคน
                 workload_count = active_tasks['ผู้รับผิดชอบหลัก'].value_counts().reset_index()
@@ -740,8 +750,8 @@ elif menu == "📊 4. ภาพรวมงานของทีม (Team Manage
                     ["ดูทุกคน"] + ["Heart", "Phubeth", "Mink", "Film", "Folk", "Chan"]
                 )
             
-            # ทำการกรองข้อมูลตามที่ผู้ใช้เลือก
-            filtered_df = df_tasks.copy()
+            # 🌟 ทำการกรองข้อมูลตามที่ผู้ใช้เลือก (จากฐานข้อมูลล่าสุด df_latest_tasks)
+            filtered_df = df_latest_tasks.copy()
             if filter_status:
                 filtered_df = filtered_df[filtered_df['สถานะงาน'].isin(filter_status)]
                 
@@ -751,14 +761,24 @@ elif menu == "📊 4. ภาพรวมงานของทีม (Team Manage
                     (filtered_df['ผู้ช่วย'].str.contains(filter_person, na=False))
                 ]
             
+            # 🌟 จัดเรียงคอลัมน์ให้สวยงามและอ่านง่าย (เพิ่มปัญหา/หมายเหตุ เข้ามาด้วย)
+            display_cols = ['วันที่เข้าทำ (Scheduled Date)', 'ชื่อไซต์งาน', 'ชื่องาน / รายละเอียด', 'ประเภทงาน', 'สถานะงาน', 'ผู้รับผิดชอบหลัก', 'ผู้ช่วย', 'ปัญหา/หมายเหตุ']
+            available_cols = [col for col in display_cols if col in filtered_df.columns]
+            
+            # 🌟 ใส่สีให้สถานะงานเหมือนเมนู 3
+            def highlight_status_m4(val):
+                color = 'red' if 'Problem' in str(val) else ('green' if 'Complete' in str(val) else 'orange')
+                return f'color: {color}'
+            
             # แสดงตารางผลลัพธ์
-            st.dataframe(filtered_df, use_container_width=True, hide_index=True)
+            st.dataframe(filtered_df[available_cols].style.applymap(highlight_status_m4, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
             
         else:
             st.info("ยังไม่มีข้อมูลงานในระบบครับ")
             
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการโหลดตารางงาน: {e}")
+#หน้าที่5 ----------------------------------------------------------------------------------------
 elif menu == "🧰 5. ระบบเบิก-คืนอุปกรณ์ (Tools)":
     st.title("🧰 ระบบเบิก-คืนอุปกรณ์ส่วนกลาง")
     st.write("บันทึกประวัติ พร้อมระบบนับสต๊อกและคำนวณของคงเหลืออัตโนมัติ")
