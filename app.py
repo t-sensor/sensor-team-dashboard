@@ -64,7 +64,8 @@ def send_line_message(message):
     except Exception as e:
         st.error(f"ระบบส่ง LINE ขัดข้อง: {e}")
 # --- 1. ตั้งค่าหน้าเว็บ ---
-st.set_page_config(page_title="Sensor Team System", page_icon="⚙️", layout="wide")
+# เปลี่ยน page_icon ให้ดึงไฟล์รูปแทนอีโมจิ
+st.set_page_config(page_title="Sensor Team System", page_icon="logo.png", layout="wide")
 
 # กุญแจเชื่อมต่อ GSheet
 GAS_URL = st.secrets["GAS_URL"]
@@ -113,15 +114,23 @@ if raw:
         pass
 
 # 3. หน้าต่าง Login
+# 3. หน้าต่าง Login
 if not st.session_state['logged_in']:
+    st.markdown("<br><br>", unsafe_allow_html=True) # ดันให้ฟอร์มลงมากลางจออีกนิด
+    
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        # 🌟 เพิ่มโลโก้ทีมตรงนี้ (ปรับตัวเลข width เพื่อย่อ/ขยายขนาดรูปได้ครับ)
-        st.image("logo.png", width=250) 
         
+        # 🌟 เทคนิคจัดกึ่งกลาง: สร้างพื้นที่ซ้าย-กลาง-ขวา บีบให้รูปอยู่ตรงกลาง
+        img_col1, img_col2, img_col3 = st.columns([1, 1.5, 1])
+        with img_col2:
+            st.image("logo.png", use_container_width=True)
+            
         st.markdown("<h1 style='text-align: center; color: #008080;'>🔐 Sensor Team Login</h1>", unsafe_allow_html=True)
         st.markdown("---")
         st.info("กรุณาเข้าสู่ระบบ หากยังไม่มีรหัส กรุณาลงทะเบียนและรออนุมัติ")
+        
+        # ... (โค้ดฟอร์ม Login ข้างล่างเหมือนเดิมครับ) ...
         with st.form("login_form"):
             input_user = st.text_input("👤 Username")
             input_pass = st.text_input("🔑 Password", type="password")
