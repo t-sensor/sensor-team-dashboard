@@ -184,10 +184,14 @@ CURRENT_USER = st.session_state['username']
 CURRENT_ROLE = st.session_state['role'].lower()
 
 # --- 3. สร้างระบบเมนูแถบด้านข้าง (Sidebar) ตามสิทธิ์ ---
+# 🌟 เพิ่มโลโก้ไว้บนสุดของแถบด้านซ้าย
+st.sidebar.image("logo.png", use_container_width=True) 
+
 st.sidebar.title("🛠️ Sensor Team Menu")
 
 # เช็คสิทธิ์ (Admin กับ Member เห็นทุกอย่าง / User เห็นแค่บางเมนู)
 if CURRENT_ROLE in ['admin', 'member']:
+# ... (โค้ดเมนูเดิม) ...
     menu_options = [
         "🏠 1. ภาพรวมและสถิติ (Dashboard)",
         "🏢 2. เจาะลึกรายไซต์ (Site Detail)",
@@ -228,7 +232,7 @@ if st.sidebar.button("🚪 ออกจากระบบ", use_container_width=
 # --- 4. โครงสร้างแต่ละเมนู (โค้ด Dashboard ที่เหลือของคุณ Heart จะต่อจากตรงนี้ลงไปเหมือนเดิมครับ) ---
 # --- ส่วนที่ 1: Dashboard อัจฉริยะ (เมนู 1) ---
 if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
-    st.title("📊 ศูนย์บัญชาการทีม Sensor (Command Center)")
+    st.title("📊 Team Sensor Command Center")
     st.write("ภาพรวมสรุปข้อมูล แผนที่ และสถานะ PM อัจฉริยะแบบ Real-time")
     st.markdown("---")
 
