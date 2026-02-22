@@ -465,95 +465,188 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
         
 #หน้า3 
 #หน้า3 
+#หน้า3 
 elif menu == "📱 3. กระดานงานส่วนตัว (My Workload)":
     st.title("📱 กระดานงานส่วนตัว")
     
-    # 1. กำหนดชื่อผู้ใช้งานปัจจุบัน (ดึงจากระบบ Login)
-    # 🌟 อัปเดตให้ใช้ชื่อจาก Session ที่ล็อกอินเข้ามาแทนแบบ Fix ค่าเดิม
+    # 1. ระบุตัวตน
     CURRENT_USER = st.session_state.get('username', 'ไม่ระบุตัวตน')
     st.info(f"👤 สวัสดีครับคุณ **{CURRENT_USER}** นี่คืองานที่อยู่ในความรับผิดชอบของคุณครับ")
 
-    # 2. --- ส่วนแสดงตารางงานของตัวเอง (คงของเดิมไว้ 100%) ---
+    # โหลดข้อมูลงาน
     try:
         df_tasks = load_sheet("Task & Workload")
-        
         if not df_tasks.empty:
             df_tasks.columns = [str(c).strip() for c in df_tasks.columns]
+    except:
+        df_tasks = pd.DataFrame()
+
+    # 2. --- ส่วนแสดงตารางงานของตัวเอง (Active Tasks) ---
+    my_active_tasks = pd.DataFrame() 
+    
+    if not df_tasks.empty and 'ผู้รับผิดชอบหลัก' in df_tasks.columns:
+        df_tasks['ผู้รับผิดชอบหลัก'] = df_tasks['ผู้รับผิดชอบหลัก'].fillna("")
+        df_tasks['ผู้ช่วย'] = df_tasks['ผู้ช่วย'].fillna("")
+        df_tasks['สถานะงาน'] = df_tasks['สถานะงาน'].fillna("")
+
+        # กรองเฉพาะงานที่ยังไม่เสร็จ
+        my_active_tasks = df_tasks[
+            ((df_tasks['ผู้รับผิดชอบหลัก'] == CURRENT_USER) | 
+             (df_tasks['ผู้ช่วย'].str.contains(CURRENT_USER, na=False))) &
+            (df_tasks['สถานะงาน'] != "Complete")
+        ]
+        
+        # กรองงานทั้งหมดของฉัน
+        my_all_tasks = df_tasks[
+            (df_tasks['ผู้รับผิดชอบหลัก'] == CURRENT_USER) | 
+            (df_tasks['ผู้ช่วย'].str.contains(CURRENT_USER, na=False))
+        ]
+
+        if not my_all_tasks.empty:
+            st.markdown("### 📋 รายการงานของคุณ")
+            display_cols = ['วันที่เข้าทำ (Scheduled Date)', 'ชื่อไซต์งาน', 'ชื่องาน / รายละเอียด', 'ประเภทงาน', 'สถานะงาน', 'ผู้ช่วย', 'ปัญหา/หมายเหตุ']
+            available_cols = [col for col in display_cols if col in df_tasks.columns]
             
-            if 'ผู้รับผิดชอบหลัก' in df_tasks.columns and 'ผู้ช่วย' in df_tasks.columns:
-                df_tasks['ผู้รับผิดชอบหลัก'] = df_tasks['ผู้รับผิดชอบหลัก'].fillna("")
-                df_tasks['ผู้ช่วย'] = df_tasks['ผู้ช่วย'].fillna("")
-                
-                my_tasks = df_tasks[
-                    (df_tasks['ผู้รับผิดชอบหลัก'] == CURRENT_USER) | 
-                    (df_tasks['ผู้ช่วย'].str.contains(CURRENT_USER, na=False))
-                ]
-                
-                if not my_tasks.empty:
-                    st.markdown("### 📋 รายการงานของคุณ")
-                    display_cols = ['วันที่เข้าทำ (Scheduled Date)', 'ชื่อไซต์งาน', 'ชื่องาน / รายละเอียด', 'ประเภทงาน', 'สถานะงาน', 'ผู้ช่วย']
-                    available_cols = [col for col in display_cols if col in df_tasks.columns]
-                    st.dataframe(my_tasks[available_cols], use_container_width=True, hide_index=True)
-                else:
-                    st.success("🎉 ตอนนี้คุณไม่มีงานค้างเลยครับ พักผ่อนได้!")
-            else:
-                st.error("⚠️ หาหัวคอลัมน์ 'ผู้รับผิดชอบหลัก' หรือ 'ผู้ช่วย' ไม่เจอครับ")
-                st.write("ชื่อคอลัมน์ที่ระบบอ่านได้จาก GSheet คือ:", df_tasks.columns.tolist())
+            def highlight_status(val):
+                color = 'red' if 'Problem' in val else ('green' if 'Complete' in val else 'orange')
+                return f'color: {color}'
+            
+            st.dataframe(my_all_tasks[available_cols].style.applymap(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
         else:
-            st.info("ตารางใน GSheet ยังว่างเปล่าครับ")
+            st.success("🎉 ตอนนี้คุณไม่มีงานค้างเลยครับ พักผ่อนได้!")
+    else:
+        st.info("กำลังโหลดข้อมูล หรือตารางยังว่างอยู่ครับ...")
+
+    st.markdown("---")
+
+    # =========================================================
+    # ⚡ ส่วนที่ 1: อัปเดตสถานะงานเดิม (ไม่ต้องกรอกใหม่)
+    # =========================================================
+    st.markdown("### ⚡ อัปเดตงานที่ค้างอยู่ (Quick Update)")
+    
+    if not my_active_tasks.empty:
+        task_options = my_active_tasks.apply(
+            lambda x: f"[{x['ชื่อไซต์งาน']}] {x['ชื่องาน / รายละเอียด']} (เริ่ม: {x['วันที่เข้าทำ (Scheduled Date)']})", axis=1
+        ).tolist()
+        
+        selected_task_str = st.selectbox("เลือกงานที่ต้องการอัปเดต:", ["-- กรุณาเลือกงาน --"] + task_options)
+        
+        if selected_task_str != "-- กรุณาเลือกงาน --":
+            task_index = task_options.index(selected_task_str)
+            original_task = my_active_tasks.iloc[task_index]
             
-    except Exception as e:
-        st.error(f"ระบบขัดข้อง: {e}")
+            with st.container(border=True):
+                st.info(f"📌 กำลังอัปเดตงาน: **{original_task['ชื่องาน / รายละเอียด']}** ณ **{original_task['ชื่อไซต์งาน']}**")
+                
+                col_u1, col_u2 = st.columns(2)
+                with col_u1:
+                    update_action = st.radio("สถานะล่าสุด:", ["✅ งานเสร็จเรียบร้อย (Complete)", "⚠️ ติดปัญหา / ยังไม่เสร็จ (Problem/In Progress)"])
+                
+                with col_u2:
+                    # 🌟 แก้ไข: บังคับให้ปุ่ม Toggle แจ้งเตือน LINE ปิดไว้เสมอ (value=False)
+                    notify_line_update = st.toggle("🔕 ส่ง LINE แจ้งเตือนทีม (กดเปิดเมื่องานสำคัญ)", value=False, key="toggle_update")
+                
+                if "Problem" in update_action:
+                    update_note = st.text_area("ระบุปัญหาหรือความคืบหน้า:", placeholder="เช่น อะไหล่ไม่พอ, ฝนตกทำงานไม่ได้...")
+                    new_status = "Problem"
+                else:
+                    update_note = "ดำเนินงานเสร็จสิ้นเรียบร้อย"
+                    new_status = "Complete"
+                
+                if st.button("บันทึกการอัปเดต", type="primary", use_container_width=True):
+                    payload = {
+                        "sheet": "Task & Workload",
+                        "data": [
+                            (pd.Timestamp.utcnow() + pd.Timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S"),
+                            original_task['ชื่อไซต์งาน'], 
+                            original_task['ชื่องาน / รายละเอียด'], 
+                            original_task['ประเภทงาน'], 
+                            original_task['วันที่เข้าทำ (Scheduled Date)'], 
+                            (pd.Timestamp.utcnow() + pd.Timedelta(hours=7)).strftime("%d/%m/%Y"), 
+                            new_status, 
+                            CURRENT_USER, 
+                            original_task['ผู้ช่วย'],
+                            update_note 
+                        ]
+                    }
+                    
+                    with st.spinner("กำลังบันทึกสถานะ..."):
+                        try:
+                            requests.post(GAS_URL, data=json.dumps(payload))
+                            
+                            if notify_line_update:
+                                msg_icon = "✅" if new_status == "Complete" else "⚠️"
+                                line_msg = (
+                                    f"{msg_icon} อัปเดตสถานะงาน!\n"
+                                    f"━━━━━━━━━━━━━\n"
+                                    f"👷 โดย: {CURRENT_USER}\n"
+                                    f"🏢 ไซต์: {original_task['ชื่อไซต์งาน']}\n"
+                                    f"📋 งาน: {original_task['ชื่องาน / รายละเอียด']}\n"
+                                    f"📌 สถานะ: {new_status}\n"
+                                    f"💬 ปัญหา/หมายเหตุ: {update_note}"
+                                )
+                                send_line_message(line_msg)
+                            
+                            st.success("อัปเดตสถานะเรียบร้อย!")
+                            st.cache_data.clear()
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"เกิดข้อผิดพลาด: {e}")
+
+    else:
+        st.info("เยี่ยมมาก! คุณไม่มีงานค้างที่ต้องอัปเดตครับ")
+
+    st.markdown("---")
+
+    # =========================================================
+    # ➕ ส่วนที่ 2: ฟอร์มแจ้งงานใหม่ (New Task)
+    # =========================================================
+    st.markdown("### ➕ เปิดใบงานใหม่ (Create New Task)")
     
-    # 3. --- ส่วนฟอร์มกรอกงานด่วน (อัปเกรด Dropdown & อื่นๆ) ---
-    st.markdown("### ➕ ฟอร์มแจ้งงานด่วน / อัปเดตงาน")
-    
-    # ดึงรายชื่อทีม
     team_members = ["Heart", "Phubeth", "Mink", "Film", "Folk", "Chan"]
-    
-    # 🌟 ดึงรายชื่อไซต์งานทั้งหมดมาทำ Dropdown
     try:
         df_master_m3 = load_sheet("Master_Site")
-        site_list_m3 = df_master_m3['ชื่อไซต์งาน (Process Work)'].dropna().unique().tolist()
+        site_list_m3 = sorted(df_master_m3['ชื่อไซต์งาน (Process Work)'].dropna().unique().tolist())
     except:
         site_list_m3 = []
-        
-    # เติมตัวเลือก "อื่นๆ" ไว้ล่างสุด
+    
     site_options_m3 = site_list_m3 + ["➕ อื่นๆ (ระบุเอง)"]
 
-    # 🌟 ใช้ st.container แทน st.form เพื่อให้โชว์ช่องพิมพ์ "อื่นๆ" ได้แบบ Real-time
     with st.container(border=True):
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Dropdown เลือกไซต์งาน
-            selected_site_m3 = st.selectbox("ชื่อไซต์งาน", site_options_m3)
-            
-            # ถ้าเลือกอื่นๆ ให้มีช่องพิมพ์โผล่มา
+        c1, c2 = st.columns(2)
+        with c1:
+            selected_site_m3 = st.selectbox("สถานที่ / ไซต์งาน", site_options_m3)
             if selected_site_m3 == "➕ อื่นๆ (ระบุเอง)":
                 final_site_name = st.text_input("ระบุชื่อไซต์งานใหม่:", placeholder="พิมพ์ชื่อไซต์ที่นี่...")
             else:
                 final_site_name = selected_site_m3
                 
-            task_detail = st.text_input("ชื่องาน / รายละเอียด", placeholder="เช่น เข้าไปเปลี่ยนซิมเร้าเตอร์")
+            task_detail = st.text_input("รายละเอียดงาน", placeholder="เช่น เข้าไปเปลี่ยนซิมเร้าเตอร์")
             task_type = st.selectbox("ประเภทงาน", ["งานด่วน", "งานตามแพลน", "งานโปรเจกต์"])
-            status = st.selectbox("สถานะงาน", ["Planning", "In progress", "Problem", "Complete"])
-            
-        with col2:
-            start_date = st.date_input("วันที่เข้าทำ (Scheduled Date)")
-            end_date = st.date_input("กำหนดเสร็จ (Deadline)")
-            
-            # 🌟 ให้ Default ผู้รับผิดชอบ เป็นชื่อคนที่ล็อกอินอยู่เลย (เพื่อความรวดเร็ว)
-            default_assignee_idx = team_members.index(CURRENT_USER) if CURRENT_USER in team_members else 0
-            assignee = st.selectbox("ผู้รับผิดชอบหลัก", team_members, index=default_assignee_idx)
-            
-            assistants = st.multiselect("ผู้ช่วย (ถ้ามี)", team_members)
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        # เปลี่ยนเป็น st.button ธรรมดา (เพราะไม่ได้ใช้ st.form แล้ว)
-        submitted = st.button("บันทึกข้อมูลลงตาราง", type="primary", use_container_width=True)
         
-        if submitted:
+        with c2:
+            start_date = st.date_input("วันที่เข้าทำ")
+            end_date = st.date_input("กำหนดเสร็จ")
+            status = st.selectbox("สถานะเริ่มต้น", ["Planning", "In progress"])
+            
+            try:
+                def_idx = team_members.index(CURRENT_USER)
+            except:
+                def_idx = 0
+            assignee = st.selectbox("ผู้รับผิดชอบหลัก", team_members, index=def_idx)
+            assistants = st.multiselect("ผู้ช่วย (ถ้ามี)", team_members)
+
+        st.markdown("---")
+        col_btn, col_toggle = st.columns([2, 1])
+        with col_toggle:
+            # 🌟 แก้ไข: บังคับให้ปุ่ม Toggle แจ้งเตือน LINE ปิดไว้เสมอ (value=False)
+            notify_line_new = st.toggle("🔕 ส่ง LINE แจ้งเตือนทีม (กดเปิดเมื่องานสำคัญ)", value=False, key="toggle_new")
+        
+        with col_btn:
+            submitted_new = st.button("สร้างงานใหม่", type="primary", use_container_width=True)
+        
+        if submitted_new:
             if final_site_name and task_detail:
                 assistants_str = ", ".join(assistants)
                 payload = {
@@ -562,34 +655,37 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                         (pd.Timestamp.utcnow() + pd.Timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S"),
                         final_site_name, task_detail, task_type, 
                         start_date.strftime("%d/%m/%Y"), end_date.strftime("%d/%m/%Y"), 
-                        status, assignee, assistants_str
+                        status, assignee, assistants_str,
+                        "-" 
                     ]
                 }
-                with st.spinner("กำลังส่งข้อมูลเข้าตาราง..."):
+                with st.spinner("กำลังบันทึกข้อมูล..."):
                     try:
-                        response = requests.post(GAS_URL, data=json.dumps(payload))
-# ✅ แก้เป็นแบบนี้ (ต้องเยื้องให้อยู่ใน if)
-                        if response.json().get("status") == "success":
-                            st.success(f"บันทึกงาน '{task_detail}' ที่ '{final_site_name}' สำเร็จ! 🎉")
-                            send_line_message(
-                                f"🔔 งานใหม่เข้าระบบ!\n"
-                                f"━━━━━━━━━━━━━\n"
-                                f"👤 ผู้แจ้ง: {CURRENT_USER}\n"
-                                f"🏢 ไซต์: {final_site_name}\n"
-                                f"📋 งาน: {task_detail}\n"
-                                f"🏷️ ประเภท: {task_type}\n"
-                                f"📌 สถานะ: {status}\n"
-                                f"📅 วันเข้าทำ: {start_date.strftime('%d/%m/%Y')}\n"
-                                f"⏰ กำหนดเสร็จ: {end_date.strftime('%d/%m/%Y')}\n"
-                                f"👷 ผู้รับผิดชอบ: {assignee}\n"
-                                f"🤝 ผู้ช่วย: {assistants_str if assistants_str else '-'}"
-                            )
-                            st.cache_data.clear()
-                            st.rerun()
+                        res = requests.post(GAS_URL, data=json.dumps(payload))
+                        
+                        if notify_line_new: 
+                            if res.json().get("status") == "success":
+                                line_msg = (
+                                    f"🔔 เปิดใบงานใหม่!\n"
+                                    f"━━━━━━━━━━━━━\n"
+                                    f"👤 แจ้งโดย: {CURRENT_USER}\n"
+                                    f"🏢 ไซต์: {final_site_name}\n"
+                                    f"📋 งาน: {task_detail}\n"
+                                    f"🏷️ ประเภท: {task_type}\n"
+                                    f"📅 เริ่ม: {start_date.strftime('%d/%m/%Y')}\n"
+                                    f"👷 รับผิดชอบ: {assignee}"
+                                )
+                                send_line_message(line_msg)
+                        
+                        st.success(f"บันทึกงาน '{task_detail}' เรียบร้อย!")
+                        st.cache_data.clear()
+                        time.sleep(1)
+                        st.rerun()
+                        
                     except Exception as e:
                         st.error(f"ระบบขัดข้อง: {e}")
             else:
-                st.warning("⚠️ กรุณากรอก 'ชื่อไซต์งาน' และ 'รายละเอียดงาน' ให้ครบถ้วนครับ")
+                st.warning("⚠️ กรุณาระบุ 'ชื่อไซต์' และ 'รายละเอียดงาน'")
 elif menu == "📊 4. ภาพรวมงานของทีม (Team Manager)":
     st.title("📊 ภาพรวมงานของทีม (Team Workload)")
     st.write("ศูนย์บัญชาการสำหรับดูภาระงานของทุกคนในทีม เพื่อประกอบการตัดสินใจจ่ายงาน")
