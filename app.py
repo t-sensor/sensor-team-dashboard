@@ -463,9 +463,8 @@ elif menu == "🏢 2. เจาะลึกรายไซต์ (Site Detail)":
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดที่เมนู 2: {e}")
         
-#หน้า3 
-#หน้า3 
-#หน้า3 
+
+#หน้า3 ---------------------------------------------------------------------------------------------
 elif menu == "📱 3. กระดานงานส่วนตัว (My Workload)":
     st.title("📱 กระดานงานส่วนตัว")
     
@@ -481,7 +480,7 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
     except:
         df_tasks = pd.DataFrame()
 
-    # 2. --- ส่วนแสดงตารางงานของตัวเอง (Active Tasks) ---
+# 2. --- ส่วนแสดงตารางงานของตัวเอง (Active Tasks) ---
     my_active_tasks = pd.DataFrame() 
     
     if not df_tasks.empty and 'ผู้รับผิดชอบหลัก' in df_tasks.columns:
@@ -489,21 +488,23 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
         df_tasks['ผู้ช่วย'] = df_tasks['ผู้ช่วย'].fillna("")
         df_tasks['สถานะงาน'] = df_tasks['สถานะงาน'].fillna("")
 
-        # กรองเฉพาะงานที่ยังไม่เสร็จ
-        my_active_tasks = df_tasks[
-            ((df_tasks['ผู้รับผิดชอบหลัก'] == CURRENT_USER) | 
-             (df_tasks['ผู้ช่วย'].str.contains(CURRENT_USER, na=False))) &
-            (df_tasks['สถานะงาน'] != "Complete")
-        ]
-        
-        # กรองงานทั้งหมดของฉัน
-        my_all_tasks = df_tasks[
-            (df_tasks['ผู้รับผิดชอบหลัก'] == CURRENT_USER) | 
-            (df_tasks['ผู้ช่วย'].str.contains(CURRENT_USER, na=False))
+        # 🌟 ความอัจฉริยะที่เพิ่มขึ้น: รวบงานที่ซ้ำกัน (ไซต์และชื่องานเหมือนกัน) โดยยึด "สถานะล่าสุด" (บรรทัดล่างสุด)
+        df_latest_tasks = df_tasks.drop_duplicates(
+            subset=['ชื่อไซต์งาน', 'ชื่องาน / รายละเอียด'], 
+            keep='last'
+        )
+
+        # กรองเฉพาะงานของฉัน (จากรายการที่อัปเดตล่าสุดแล้ว)
+        my_all_tasks = df_latest_tasks[
+            (df_latest_tasks['ผู้รับผิดชอบหลัก'] == CURRENT_USER) | 
+            (df_latest_tasks['ผู้ช่วย'].str.contains(CURRENT_USER, na=False))
         ]
 
+        # แยกเฉพาะงานที่ยัง "ไม่เสร็จ" เพื่อเอาไปส่งให้ Dropdown อัปเดตงาน
+        my_active_tasks = my_all_tasks[my_all_tasks['สถานะงาน'] != "Complete"]
+
         if not my_all_tasks.empty:
-            st.markdown("### 📋 รายการงานของคุณ")
+            st.markdown("### 📋 รายการงานของคุณ (อัปเดตล่าสุด)")
             display_cols = ['วันที่เข้าทำ (Scheduled Date)', 'ชื่อไซต์งาน', 'ชื่องาน / รายละเอียด', 'ประเภทงาน', 'สถานะงาน', 'ผู้ช่วย', 'ปัญหา/หมายเหตุ']
             available_cols = [col for col in display_cols if col in df_tasks.columns]
             
@@ -511,6 +512,7 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                 color = 'red' if 'Problem' in val else ('green' if 'Complete' in val else 'orange')
                 return f'color: {color}'
             
+            # โชว์ตารางงานทั้งหมดของฉัน (ที่รวบประวัติซ้ำๆ ออกไปแล้ว)
             st.dataframe(my_all_tasks[available_cols].style.applymap(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
         else:
             st.success("🎉 ตอนนี้คุณไม่มีงานค้างเลยครับ พักผ่อนได้!")
