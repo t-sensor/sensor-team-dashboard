@@ -318,7 +318,7 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                 dot_color = site_colors.get(s_name, "gray")
                 folium.Marker([r['ละติจูด (Latitude)'], r['ลองจิจูด (Longitude)']], 
                               popup=s_name, icon=folium.Icon(color=dot_color)).add_to(m)
-            st_folium(m, width=1000, height=400)
+            st_folium(m, height=400, use_container_width=True)
             
     except Exception as e: 
         st.warning(f"ระบบกำลังโหลดข้อมูล... ({e})")
