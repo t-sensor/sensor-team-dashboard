@@ -803,46 +803,50 @@ elif menu == "📊 4. ภาพรวมงานของทีม (Team Manage
             else:
                 df_latest_tasks = df_tasks.copy()
             
-            # --- 📈 ส่วนที่ 1: กราฟสรุปภาระงาน (Workload) ---
 # --- 📈 ส่วนที่ 1: กราฟสรุปภาระงาน (Workload) ---
-            st.markdown("### 📈 ภาระงานรายบุคคล (รวมผู้รับผิดชอบหลักและผู้ช่วย)")
+            st.markdown("### 📈 ภาระงานรายบุคคล (แยกผู้รับผิดชอบหลัก / ผู้ช่วย)")
             
-            # 🌟 แก้ไขที่ 2: ระบบนับงานแบบใหม่ ที่แยกรายชื่อผู้ช่วยออกมานับด้วย
+            # ดึงเฉพาะงานที่ยังไม่เสร็จ
             active_tasks = df_latest_tasks[df_latest_tasks['สถานะงาน'] != 'Complete']
             
-            workload_dict = {}
+            records = []
             for _, row in active_tasks.iterrows():
-                involved_people = []
-                
-                # ดึงชื่อผู้รับผิดชอบหลัก
+                # 1. ดึงชื่อผู้รับผิดชอบหลัก
                 main_p = str(row.get('ผู้รับผิดชอบหลัก', '')).strip()
-                if main_p and main_p.lower() != 'nan':
-                    involved_people.append(main_p)
+                if main_p and main_p.lower() != 'nan' and main_p != '-':
+                    records.append({'ชื่อทีมงาน': main_p, 'บทบาท': 'ผู้รับผิดชอบหลัก'})
                 
-                # ดึงชื่อผู้ช่วย (ใช้คอมม่าแยกชื่อถ้ามีหลายคน)
+                # 2. ดึงชื่อผู้ช่วย
                 asst_str = str(row.get('ผู้ช่วย', '')).strip()
                 if asst_str and asst_str.lower() != 'nan' and asst_str != '-':
                     assistants = [a.strip() for a in asst_str.split(',') if a.strip()]
-                    involved_people.extend(assistants)
-                
-                # นำชื่อทุกคนในงานนี้มารวมกัน และป้องกันการนับซ้ำ (เผื่อใส่ชื่อตัวเองทั้งช่องหลักและช่องช่วย)
-                for person in set(involved_people):
-                    workload_dict[person] = workload_dict.get(person, 0) + 1
+                    for a in assistants:
+                        # ป้องกันกรณีกรอกชื่อซ้ำ (เผลอใส่ชื่อตัวเองเป็นทั้งตัวหลักและผู้ช่วยในงานเดียวกัน)
+                        if a != main_p:
+                            records.append({'ชื่อทีมงาน': a, 'บทบาท': 'ผู้ช่วย'})
 
-            # วาดกราฟ
-            if workload_dict:
-                workload_df = pd.DataFrame(list(workload_dict.items()), columns=['ชื่อทีมงาน', 'จำนวนงาน (ชิ้น)'])
-                workload_df = workload_df.sort_values(by='จำนวนงาน (ชิ้น)', ascending=False) # เรียงจากคนงานเยอะไปน้อย
+            if records:
+                # สร้างตารางข้อมูลจากรายการข้างบน
+                df_roles = pd.DataFrame(records)
+                # จัดกลุ่มนับจำนวน
+                workload_df = df_roles.groupby(['ชื่อทีมงาน', 'บทบาท']).size().reset_index(name='จำนวนงาน (ชิ้น)')
                 
+                # วาดกราฟแท่งแบบคู่กัน (Grouped Bar Chart)
                 fig = px.bar(
                     workload_df, 
                     x='ชื่อทีมงาน', 
                     y='จำนวนงาน (ชิ้น)', 
+                    color='บทบาท',          # แยกสีตามบทบาท
+                    barmode='group',        # สั่งให้แท่งแยกกันยืนซ้าย-ขวา
                     text='จำนวนงาน (ชิ้น)',
-                    color='ชื่อทีมงาน',
-                    title="จำนวนงานที่ค้างอยู่ของแต่ละคน (Active Tasks)"
+                    color_discrete_map={'ผู้รับผิดชอบหลัก': '#008080', 'ผู้ช่วย': '#FF9F36'}, # สีเขียวคุมโทนเว็บ และสีส้มตัดกัน
+                    title="เปรียบเทียบภาระงาน (หัวหน้างาน vs ผู้ช่วย)"
                 )
+                
                 fig.update_traces(textposition='outside') 
+                # บังคับแกน Y ให้เป็นเลขจำนวนเต็มเท่านั้น (ไม่มี 0.5 งาน)
+                fig.update_layout(yaxis=dict(dtick=1))
+                
                 st.plotly_chart(fig, use_container_width=True)
             else:
                 st.success("🎉 ตอนนี้ทีมว่างทุกคน ไม่มีงานค้างครับ!")
