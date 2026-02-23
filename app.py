@@ -804,27 +804,48 @@ elif menu == "📊 4. ภาพรวมงานของทีม (Team Manage
                 df_latest_tasks = df_tasks.copy()
             
             # --- 📈 ส่วนที่ 1: กราฟสรุปภาระงาน (Workload) ---
-            st.markdown("### 📈 ภาระงานรายบุคคล (เฉพาะงานหลักที่รับผิดชอบ)")
+# --- 📈 ส่วนที่ 1: กราฟสรุปภาระงาน (Workload) ---
+            st.markdown("### 📈 ภาระงานรายบุคคล (รวมผู้รับผิดชอบหลักและผู้ช่วย)")
             
-            if 'ผู้รับผิดชอบหลัก' in df_latest_tasks.columns:
-                # 🌟 กรองเอางานที่เสร็จแล้วออกไป (อ่านจาก df_latest_tasks ที่กรองประวัติซ้ำแล้ว)
-                active_tasks = df_latest_tasks[df_latest_tasks['สถานะงาน'] != 'Complete']
+            # 🌟 แก้ไขที่ 2: ระบบนับงานแบบใหม่ ที่แยกรายชื่อผู้ช่วยออกมานับด้วย
+            active_tasks = df_latest_tasks[df_latest_tasks['สถานะงาน'] != 'Complete']
+            
+            workload_dict = {}
+            for _, row in active_tasks.iterrows():
+                involved_people = []
                 
-                # นับจำนวนงานของแต่ละคน
-                workload_count = active_tasks['ผู้รับผิดชอบหลัก'].value_counts().reset_index()
-                workload_count.columns = ['ชื่อทีมงาน', 'จำนวนงาน (ชิ้น)']
+                # ดึงชื่อผู้รับผิดชอบหลัก
+                main_p = str(row.get('ผู้รับผิดชอบหลัก', '')).strip()
+                if main_p and main_p.lower() != 'nan':
+                    involved_people.append(main_p)
                 
-                # วาดกราฟแท่งด้วย Plotly
+                # ดึงชื่อผู้ช่วย (ใช้คอมม่าแยกชื่อถ้ามีหลายคน)
+                asst_str = str(row.get('ผู้ช่วย', '')).strip()
+                if asst_str and asst_str.lower() != 'nan' and asst_str != '-':
+                    assistants = [a.strip() for a in asst_str.split(',') if a.strip()]
+                    involved_people.extend(assistants)
+                
+                # นำชื่อทุกคนในงานนี้มารวมกัน และป้องกันการนับซ้ำ (เผื่อใส่ชื่อตัวเองทั้งช่องหลักและช่องช่วย)
+                for person in set(involved_people):
+                    workload_dict[person] = workload_dict.get(person, 0) + 1
+
+            # วาดกราฟ
+            if workload_dict:
+                workload_df = pd.DataFrame(list(workload_dict.items()), columns=['ชื่อทีมงาน', 'จำนวนงาน (ชิ้น)'])
+                workload_df = workload_df.sort_values(by='จำนวนงาน (ชิ้น)', ascending=False) # เรียงจากคนงานเยอะไปน้อย
+                
                 fig = px.bar(
-                    workload_count, 
+                    workload_df, 
                     x='ชื่อทีมงาน', 
                     y='จำนวนงาน (ชิ้น)', 
                     text='จำนวนงาน (ชิ้น)',
                     color='ชื่อทีมงาน',
                     title="จำนวนงานที่ค้างอยู่ของแต่ละคน (Active Tasks)"
                 )
-                fig.update_traces(textposition='outside') # ให้ตัวเลขอยู่บนแท่งกราฟ
+                fig.update_traces(textposition='outside') 
                 st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.success("🎉 ตอนนี้ทีมว่างทุกคน ไม่มีงานค้างครับ!")
             
             st.markdown("---")
             
