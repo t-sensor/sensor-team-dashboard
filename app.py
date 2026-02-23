@@ -73,7 +73,6 @@ SHEET_URL = st.secrets["SHEET_URL"]
 
 
 # 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
-# 🌟 --- ฟังก์ชันส่วนกลาง --- 🌟
 @st.cache_data(ttl=5)
 def load_sheet(sheet_name):
     import time
@@ -403,15 +402,19 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
         st.markdown("### 🗓️ ตารางติดตามสถานะ PM")
         st.dataframe(df_status.sort_values(by="สถานะ"), use_container_width=True, hide_index=True)
 
-        # 🗺️ แผนที่
+# 🗺️ แผนที่
         st.markdown("### 🗺️ แผนที่พิกัดไซต์งาน (สีหมุดตามสถานะ PM)")
         if not df_master.empty and 'ละติจูด (Latitude)' in df_master.columns:
-            m = folium.Map(location=[13.73, 100.52], zoom_start=6)
+            
+            # 🌟 จุดที่แก้ไข: เติม tiles='CartoDB dark_matter' เข้าไปเพื่อเปลี่ยนเป็นธีมดำ
+            m = folium.Map(location=[13.73, 100.52], zoom_start=6, tiles='CartoDB dark_matter')
+            
             for _, r in df_master.dropna(subset=['ละติจูด (Latitude)', 'ลองจิจูด (Longitude)']).iterrows():
                 s_name = str(r['ชื่อไซต์งาน (Process Work)']).strip()
                 dot_color = site_colors.get(s_name, "gray")
                 folium.Marker([r['ละติจูด (Latitude)'], r['ลองจิจูด (Longitude)']], 
                               popup=s_name, icon=folium.Icon(color=dot_color)).add_to(m)
+            
             st_folium(m, height=600, use_container_width=True)
             
     except Exception as e: 
