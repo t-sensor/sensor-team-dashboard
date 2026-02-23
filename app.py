@@ -256,7 +256,8 @@ if CURRENT_ROLE in ['admin', 'member']:
         "🧰 5. ระบบเบิก-คืนอุปกรณ์ (Tools)",
         "👥 6. ข้อมูลทีม (Team Profile)",
         "🧠 7. ศูนย์การเรียนรู้ (Learning & Quiz)",
-        "📚 8. คู่มือการใช้งาน (Manuals & Docs)"
+        "📚 8. คู่มือการใช้งาน (Manuals & Docs)",
+        "📅 9. แผนงานล่วงหน้า (Planned Tasks)" # 🌟 เพิ่มบรรทัดนี้ครับ (อย่าลืมใส่ลูกน้ำที่บรรทัดก่อนหน้า)
     ]
 else:
     menu_options = [
@@ -1299,6 +1300,99 @@ elif menu == "📚 8. คู่มือการใช้งาน (Manuals & D
             
     except Exception as e:
         st.warning(f"ระบบกำลังรอการเชื่อมต่อกับแผ่น 'Manual_Docs' ใน Google Sheets ครับ")
+#หน้าที่9 --------------------------------------------------------------------------------
+elif menu == "📅 9. แผนงานล่วงหน้า (Planned Tasks)":
+    st.title("📅 แผนงานล่วงหน้า (Upcoming Projects & Plans)")
+    st.write("ตารางบันทึกคิวงาน โปรเจกต์ติดตั้ง หรือแผนงานที่ทราบล่วงหน้า เพื่อเตรียมความพร้อมของทีม")
+
+    # 1. โหลดข้อมูลไซต์และทีมงาน
+    try:
+        df_master = load_sheet("Master_Site")
+        site_list = sorted(df_master['ชื่อไซต์งาน (Process Work)'].dropna().unique().tolist())
+    except:
+        site_list = []
+    
+    site_options = site_list + ["➕ อื่นๆ (ระบุเอง)"]
+    team_members = ["ยังไม่ระบุตัวตน", "Heart", "Phubeth", "Mink", "Film", "Folk", "Chan"]
+
+    # 2. ฟอร์มเพิ่มแผนงานใหม่ (ซ่อนไว้ใน Expander เพื่อความสะอาดตา)
+    with st.expander("➕ กดเพื่อเพิ่มแผนงานล่วงหน้า (Add New Plan)", expanded=False):
+        with st.form("add_plan_form"):
+            c1, c2 = st.columns(2)
+            with c1:
+                selected_site = st.selectbox("สถานที่ / ไซต์งาน", site_options)
+                custom_site = st.text_input("ชื่อไซต์งาน (กรณีเลือกอื่นๆ):")
+                task_detail = st.text_input("รายละเอียดโปรเจกต์ / แผนงาน:", placeholder="เช่น งานติดตั้งระบบใหม่ที่ Michelin หรือเช็คระบบ Rojana Power Plant...")
+            with c2:
+                target_date = st.date_input("กำหนดการโดยประมาณ (Target Date)")
+                assignee = st.selectbox("ผู้รับผิดชอบโครงการ (ถ้าทราบ)", team_members)
+                status = st.selectbox("สถานะแผนงาน", ["🟡 รอคอนเฟิร์ม (Tentative)", "🟢 ยืนยันแล้ว (Confirmed)", "🔵 โอนไปเป็นใบงานจริงแล้ว (Moved)"])
+            
+            remark = st.text_input("หมายเหตุ / สิ่งที่ต้องเตรียม:", placeholder="เช่น รอของเข้า, เตรียมสั่งอุปกรณ์ติดตั้ง, ขอกำลังเสริม...")
+            
+            submitted = st.form_submit_button("💾 บันทึกแผนงานล่วงหน้า", type="primary", use_container_width=True)
+            
+            if submitted:
+                final_site = custom_site if selected_site == "➕ อื่นๆ (ระบุเอง)" else selected_site
+                if final_site and task_detail:
+                    payload = {
+                        "sheet": "Planned_Tasks",
+                        "data": [
+                            (pd.Timestamp.utcnow() + pd.Timedelta(hours=7)).strftime("%Y-%m-%d %H:%M:%S"),
+                            final_site,
+                            task_detail,
+                            target_date.strftime("%d/%m/%Y"),
+                            assignee,
+                            status,
+                            remark
+                        ]
+                    }
+                    with st.spinner("กำลังบันทึกแผนงานล่วงหน้า..."):
+                        try:
+                            requests.post(GAS_URL, data=json.dumps(payload))
+                            st.success(f"บันทึกแผนงาน '{task_detail}' ลงระบบเรียบร้อย!")
+                            st.cache_data.clear()
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"เกิดข้อผิดพลาด: {e}")
+                else:
+                    st.warning("⚠️ กรุณาระบุชื่อไซต์และรายละเอียดงานให้ครบถ้วนครับ")
+
+    st.markdown("---")
+
+    # 3. ตารางแสดงแผนงานล่วงหน้า
+    st.markdown("### 📋 ตารางติดตามแผนงานโปรเจกต์")
+    try:
+        df_plan = load_sheet("Planned_Tasks")
+        if not df_plan.empty:
+            df_plan.columns = [str(c).strip() for c in df_plan.columns]
+            
+            # ตัวกรองข้อมูลให้ดูง่ายขึ้น
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                filter_status = st.multiselect("🔍 กรองสถานะ:", 
+                                               ["🟡 รอคอนเฟิร์ม (Tentative)", "🟢 ยืนยันแล้ว (Confirmed)", "🔵 โอนไปเป็นใบงานจริงแล้ว (Moved)"], 
+                                               default=["🟡 รอคอนเฟิร์ม (Tentative)", "🟢 ยืนยันแล้ว (Confirmed)"]) # ค่าเริ่มต้นจะไม่โชว์งานที่โอนไปทำจริงแล้ว
+            
+            # กรองตาราง
+            if filter_status and 'สถานะ' in df_plan.columns:
+                df_plan = df_plan[df_plan['สถานะ'].isin(filter_status)]
+            
+            # ใส่สีให้สถานะเพื่อความสวยงาม
+            def highlight_plan_status(val):
+                if 'รอคอนเฟิร์ม' in str(val): return 'color: #FF9F36' # สีส้ม
+                elif 'ยืนยันแล้ว' in str(val): return 'color: #008080' # สีเขียว
+                elif 'โอนไปเป็นใบงาน' in str(val): return 'color: gray' # สีเทา
+                return ''
+            
+            # แสดงตาราง
+            st.dataframe(df_plan.style.applymap(highlight_plan_status, subset=['สถานะ']), use_container_width=True, hide_index=True)
+            
+        else:
+            st.info("ยังไม่มีข้อมูลแผนงานล่วงหน้าในระบบครับ (เริ่มกดเพิ่มแผนงานด้านบนได้เลย)")
+    except Exception as e:
+        st.warning(f"ระบบกำลังรอการสร้างแผ่น 'Planned_Tasks' ใน Google Sheets ครับ")
 else:
     st.title(menu)
     st.write(f"กำลังพัฒนาฟีเจอร์สำหรับเมนูนี้ครับ...")
