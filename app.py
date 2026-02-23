@@ -804,52 +804,67 @@ elif menu == "📊 4. ภาพรวมงานของทีม (Team Manage
                 df_latest_tasks = df_tasks.copy()
             
 # --- 📈 ส่วนที่ 1: กราฟสรุปภาระงาน (Workload) ---
-            st.markdown("### 📈 ภาระงานรายบุคคล (แยกผู้รับผิดชอบหลัก / ผู้ช่วย)")
+            st.markdown("### 📈 ภาระงานรายบุคคล (Active Tasks)")
             
             # ดึงเฉพาะงานที่ยังไม่เสร็จ
             active_tasks = df_latest_tasks[df_latest_tasks['สถานะงาน'] != 'Complete']
             
-            records = []
+            records_main = []
+            records_asst = []
+            
             for _, row in active_tasks.iterrows():
-                # 1. ดึงชื่อผู้รับผิดชอบหลัก
+                # 1. แยกชื่อผู้รับผิดชอบหลัก
                 main_p = str(row.get('ผู้รับผิดชอบหลัก', '')).strip()
                 if main_p and main_p.lower() != 'nan' and main_p != '-':
-                    records.append({'ชื่อทีมงาน': main_p, 'บทบาท': 'ผู้รับผิดชอบหลัก'})
+                    records_main.append({'ชื่อทีมงาน': main_p})
                 
-                # 2. ดึงชื่อผู้ช่วย
+                # 2. แยกชื่อผู้ช่วย
                 asst_str = str(row.get('ผู้ช่วย', '')).strip()
                 if asst_str and asst_str.lower() != 'nan' and asst_str != '-':
                     assistants = [a.strip() for a in asst_str.split(',') if a.strip()]
                     for a in assistants:
-                        # ป้องกันกรณีกรอกชื่อซ้ำ (เผลอใส่ชื่อตัวเองเป็นทั้งตัวหลักและผู้ช่วยในงานเดียวกัน)
-                        if a != main_p:
-                            records.append({'ชื่อทีมงาน': a, 'บทบาท': 'ผู้ช่วย'})
+                        if a != main_p: # ป้องกันชื่อซ้ำในงานเดียวกัน
+                            records_asst.append({'ชื่อทีมงาน': a})
 
-            if records:
-                # สร้างตารางข้อมูลจากรายการข้างบน
-                df_roles = pd.DataFrame(records)
-                # จัดกลุ่มนับจำนวน
-                workload_df = df_roles.groupby(['ชื่อทีมงาน', 'บทบาท']).size().reset_index(name='จำนวนงาน (ชิ้น)')
+            # ==========================================
+            # 🌟 กราฟชุดที่ 1: ผู้รับผิดชอบหลัก (เต็มจอ)
+            # ==========================================
+            st.markdown("#### 📌 1. ผู้รับผิดชอบหลัก (Main Assignee)")
+            if records_main:
+                df_main = pd.DataFrame(records_main)
+                wl_main = df_main.groupby('ชื่อทีมงาน').size().reset_index(name='จำนวนงาน (ชิ้น)')
+                wl_main = wl_main.sort_values(by='จำนวนงาน (ชิ้น)', ascending=False)
                 
-                # วาดกราฟแท่งแบบคู่กัน (Grouped Bar Chart)
-                fig = px.bar(
-                    workload_df, 
-                    x='ชื่อทีมงาน', 
-                    y='จำนวนงาน (ชิ้น)', 
-                    color='บทบาท',          # แยกสีตามบทบาท
-                    barmode='group',        # สั่งให้แท่งแยกกันยืนซ้าย-ขวา
-                    text='จำนวนงาน (ชิ้น)',
-                    color_discrete_map={'ผู้รับผิดชอบหลัก': '#008080', 'ผู้ช่วย': '#FF9F36'}, # สีเขียวคุมโทนเว็บ และสีส้มตัดกัน
-                    title="เปรียบเทียบภาระงาน (หัวหน้างาน vs ผู้ช่วย)"
+                fig1 = px.bar(
+                    wl_main, x='ชื่อทีมงาน', y='จำนวนงาน (ชิ้น)', text='จำนวนงาน (ชิ้น)',
+                    color_discrete_sequence=['#008080'] # โทนเขียว-ฟ้า
                 )
-                
-                fig.update_traces(textposition='outside') 
-                # บังคับแกน Y ให้เป็นเลขจำนวนเต็มเท่านั้น (ไม่มี 0.5 งาน)
-                fig.update_layout(yaxis=dict(dtick=1))
-                
-                st.plotly_chart(fig, use_container_width=True)
+                fig1.update_traces(textposition='outside')
+                fig1.update_layout(yaxis=dict(dtick=1))
+                st.plotly_chart(fig1, use_container_width=True)
             else:
-                st.success("🎉 ตอนนี้ทีมว่างทุกคน ไม่มีงานค้างครับ!")
+                st.info("ไม่มีงานค้างในส่วนของผู้รับผิดชอบหลักครับ")
+
+            st.markdown("<br>", unsafe_allow_html=True) # เว้นระยะห่างระหว่างกราฟนิดนึง
+
+            # ==========================================
+            # 🌟 กราฟชุดที่ 2: ผู้ช่วยสนับสนุน (เต็มจอ)
+            # ==========================================
+            st.markdown("#### 🤝 2. ผู้ช่วยสนับสนุน (Assistant)")
+            if records_asst:
+                df_asst = pd.DataFrame(records_asst)
+                wl_asst = df_asst.groupby('ชื่อทีมงาน').size().reset_index(name='จำนวนงาน (ชิ้น)')
+                wl_asst = wl_asst.sort_values(by='จำนวนงาน (ชิ้น)', ascending=False)
+                
+                fig2 = px.bar(
+                    wl_asst, x='ชื่อทีมงาน', y='จำนวนงาน (ชิ้น)', text='จำนวนงาน (ชิ้น)',
+                    color_discrete_sequence=['#FF9F36'] # โทนส้ม
+                )
+                fig2.update_traces(textposition='outside')
+                fig2.update_layout(yaxis=dict(dtick=1))
+                st.plotly_chart(fig2, use_container_width=True)
+            else:
+                st.info("ไม่มีงานค้างในส่วนของผู้ช่วยครับ")
             
             st.markdown("---")
             
