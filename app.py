@@ -338,6 +338,11 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
         # นับจำนวนไซต์จาก Master_Site เพื่อความแม่นยำ
         total_sites_count = len(df_master['ชื่อไซต์งาน (Process Work)'].dropna().unique()) if 'ชื่อไซต์งาน (Process Work)' in df_master.columns else 0
         active_tasks = len(df_task[df_task['สถานะงาน'] != 'Complete']) if 'สถานะงาน' in df_task.columns else 0
+        if not df_task.empty and 'ชื่อไซต์งาน' in df_task.columns and 'ชื่องาน / รายละเอียด' in df_task.columns:
+            df_task_latest = df_task.drop_duplicates(subset=['ชื่อไซต์งาน', 'ชื่องาน / รายละเอียด'], keep='last')
+            active_tasks = len(df_task_latest[df_task_latest['สถานะงาน'] != 'Complete'])
+        else:
+            active_tasks = 0
         
         c1, c2, c3 = st.columns(3)
         c1.metric("🏢 จำนวนไซต์งานทั้งหมด", f"{total_sites_count} ไซต์")
