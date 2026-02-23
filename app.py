@@ -1301,6 +1301,7 @@ elif menu == "📚 8. คู่มือการใช้งาน (Manuals & D
     except Exception as e:
         st.warning(f"ระบบกำลังรอการเชื่อมต่อกับแผ่น 'Manual_Docs' ใน Google Sheets ครับ")
 #หน้าที่9 --------------------------------------------------------------------------------
+#หน้าที่9 --------------------------------------------------------------------------------
 elif menu == "📅 9. แผนงานล่วงหน้า (Planned Tasks)":
     st.title("📅 แผนงานล่วงหน้า (Upcoming Projects & Plans)")
     st.write("ตารางบันทึกคิวงาน โปรเจกต์ติดตั้ง หรือแผนงานที่ทราบล่วงหน้า เพื่อเตรียมความพร้อมของทีม")
@@ -1314,6 +1315,8 @@ elif menu == "📅 9. แผนงานล่วงหน้า (Planned Tasks)
     
     site_options = site_list + ["➕ อื่นๆ (ระบุเอง)"]
     team_members = ["ยังไม่ระบุตัวตน", "Heart", "Phubeth", "Mink", "Film", "Folk", "Chan"]
+    # ตัด "ยังไม่ระบุตัวตน" ออกจากรายชื่อผู้ช่วย
+    helper_members = [m for m in team_members if m != "ยังไม่ระบุตัวตน"]
 
     # 2. ฟอร์มเพิ่มแผนงานใหม่ (ซ่อนไว้ใน Expander เพื่อความสะอาดตา)
     with st.expander("➕ กดเพื่อเพิ่มแผนงานล่วงหน้า (Add New Plan)", expanded=False):
@@ -1326,6 +1329,10 @@ elif menu == "📅 9. แผนงานล่วงหน้า (Planned Tasks)
             with c2:
                 target_date = st.date_input("กำหนดการโดยประมาณ (Target Date)")
                 assignee = st.selectbox("ผู้รับผิดชอบโครงการ (ถ้าทราบ)", team_members)
+                
+                # 🌟 เพิ่มช่องเลือกผู้ช่วยแบบกดได้หลายคน
+                assistants = st.multiselect("ผู้ช่วย (ถ้ามี)", helper_members)
+                
                 status = st.selectbox("สถานะแผนงาน", ["🟡 รอคอนเฟิร์ม (Tentative)", "🟢 ยืนยันแล้ว (Confirmed)", "🔵 โอนไปเป็นใบงานจริงแล้ว (Moved)"])
             
             remark = st.text_input("หมายเหตุ / สิ่งที่ต้องเตรียม:", placeholder="เช่น รอของเข้า, เตรียมสั่งอุปกรณ์ติดตั้ง, ขอกำลังเสริม...")
@@ -1335,6 +1342,10 @@ elif menu == "📅 9. แผนงานล่วงหน้า (Planned Tasks)
             if submitted:
                 final_site = custom_site if selected_site == "➕ อื่นๆ (ระบุเอง)" else selected_site
                 if final_site and task_detail:
+                    
+                    # 🌟 จัดรูปแบบรายชื่อผู้ช่วยให้พร้อมส่งเข้า GSheet
+                    assistants_str = ", ".join(assistants) if assistants else "-"
+                    
                     payload = {
                         "sheet": "Planned_Tasks",
                         "data": [
@@ -1343,6 +1354,7 @@ elif menu == "📅 9. แผนงานล่วงหน้า (Planned Tasks)
                             task_detail,
                             target_date.strftime("%d/%m/%Y"),
                             assignee,
+                            assistants_str, # 👈 เพิ่มตัวแปรผู้ช่วยตรงนี้ (ตรงกับคอลัมน์ F)
                             status,
                             remark
                         ]
