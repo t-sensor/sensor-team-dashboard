@@ -755,6 +755,7 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                         
                         if notify_line_new: 
                             if res.json().get("status") == "success":
+                                helper_text = assistants_str if assistants_str else "-"
                                 line_msg = (
                                     f"🔔 เปิดใบงานใหม่!\n"
                                     f"━━━━━━━━━━━━━\n"
@@ -763,7 +764,8 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                                     f"📋 งาน: {task_detail}\n"
                                     f"🏷️ ประเภท: {task_type}\n"
                                     f"📅 เริ่ม: {start_date.strftime('%d/%m/%Y')}\n"
-                                    f"👷 รับผิดชอบ: {assignee}"
+                                    f"👷 รับผิดชอบ: {assignee}\n"       # 👈 เติม \n ให้แล้วครับ
+                                    f"🤝 ผู้ช่วย: {helper_text}"         # 👈 เปลี่ยนมาใช้ helper_text ที่จัดรูปแบบแล้ว
                                 )
                                 send_line_message(line_msg)
                         
