@@ -402,38 +402,79 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
         st.markdown("### 🗓️ ตารางติดตามสถานะ PM")
         st.dataframe(df_status.sort_values(by="สถานะ"), use_container_width=True, hide_index=True)
 # ==========================================
+# ==========================================
         # 📶 ระบบแจ้งเตือนวันหมดอายุซิม (SIM Expiration)
         # ==========================================
         st.markdown("### 📶 ข้อมูลการเชื่อมต่อ (SIM & Network)")
         
-        # ใช้ st.expander เพื่อทำเป็น Dropdown กดกางออกได้ (ซ่อนไว้ก่อนจะได้ไม่รก)
         with st.expander("🔻 กดเพื่อดูตารางวันหมดอายุซิมเร้าเตอร์ (SIM Expiration)", expanded=False):
             if 'วันที่ซิมหมดอายุ' in df_pm.columns:
-                # ดึงเฉพาะคอลัมน์ชื่อไซต์ และ วันหมดอายุ
                 df_sim = df_pm[['ชื่อไซต์งาน', 'วันที่ซิมหมดอายุ']].copy()
                 
-                # คัดกรองเอาเฉพาะแถวที่มีการกรอกข้อมูลจริง (ตัดพวกช่องว่าง หรือเครื่องหมาย - ทิ้งไป)
+                # คัดกรองเอาเฉพาะแถวที่มีการกรอกข้อมูลจริง
                 valid_sim = df_sim['วันที่ซิมหมดอายุ'].astype(str).str.strip().str.lower()
                 df_sim = df_sim[~valid_sim.isin(['nan', '', '-', 'none', 'ไม่มี'])]
                 
                 if not df_sim.empty:
-                    # 🎨 สไตล์ตารางแบบ Minimal Dark Zone (เทาเข้มตัดด้วยตัวหนังสือสีสว่าง)
-                    styled_sim = df_sim.style.set_properties(**{
-                        'background-color': '#1A1C23',  # พื้นหลังสีเทาเข้มดาร์กๆ
-                        'color': '#A6B0C3',             # ตัวอักษรสีเทาสว่าง สบายตา
-                        'border-color': '#282B36',      # สีกรอบเข้มกลืนไปกับพื้นหลัง
-                        'text-align': 'center'
+                    import re
+                    today = pd.Timestamp.today().normalize()
+                    
+                    # 🧠 ฟังก์ชันสมองกล: อ่านวันที่และเช็คสถานะ
+                    def check_sim_status(date_str):
+                        date_str = str(date_str).strip()
+                        
+                        # 1. ถ้ามีคำว่า "หมด" พิมพ์มาตรงๆ ให้แดงเลย
+                        if "หมด" in date_str or "expire" in date_str.lower():
+                            return "🔴 ซิมหมดอายุแล้ว"
+                            
+                        # 2. พยายามดึงตัวเลขวันที่ออกมา (รองรับทั้ง ค.ศ. และ พ.ศ.)
+                        parsed_date = pd.NaT
+                        match = re.search(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', date_str)
+                        if match:
+                            d, m, y = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                            if y > 2500: y -= 543  # ถ้ากรอกเป็น พ.ศ. ให้แปลงเป็น ค.ศ. ก่อนคำนวณ
+                            try:
+                                parsed_date = pd.Timestamp(year=y, month=m, day=d)
+                            except: pass
+                        else:
+                            parsed_date = pd.to_datetime(date_str, errors='coerce', dayfirst=True)
+                        
+                        # 3. นำวันที่มาเทียบกับปัจจุบัน
+                        if pd.notna(parsed_date):
+                            if parsed_date < today:
+                                return "🔴 ซิมหมดอายุแล้ว"
+                            elif (parsed_date - today).days <= 30:
+                                return "🟡 ใกล้หมดอายุ"
+                            else:
+                                return "🟢 ใช้งานได้ปกติ"
+                        else:
+                            return "⚪ ไม่ระบุ/รอตรวจสอบ"
+
+                    # 🌟 สร้างคอลัมน์ใหม่ โชว์สถานะสวยๆ
+                    df_sim['สถานะการใช้งาน'] = df_sim['วันที่ซิมหมดอายุ'].apply(check_sim_status)
+                    
+                    # 🎨 ระบบลงสีอัจฉริยะ (Minimal Dark Zone)
+                    def highlight_sim(val):
+                        if '🔴' in str(val): return 'color: #FF4B4B; font-weight: bold;' # แดงสว่าง
+                        elif '🟡' in str(val): return 'color: #FFC107; font-weight: bold;' # เหลือง
+                        elif '🟢' in str(val): return 'color: #00E676;' # เขียวสว่าง
+                        return 'color: #A6B0C3;' # เทา
+
+                    # นำสีไปผสมกับพื้นหลังดาร์กๆ
+                    styled_sim = df_sim.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
+                        'background-color': '#1A1C23',  
+                        'color': '#E2E8F0',             
+                        'border-color': '#282B36'
                     })
                     
-                    # นำไปแสดงผล
+                    # แสดงผลตาราง (จัดคอลัมน์ให้อ่านง่ายขึ้น)
                     st.dataframe(styled_sim, use_container_width=True, hide_index=True)
                 else:
                     st.info("✨ ยังไม่มีข้อมูลไซต์งานที่ซิมใกล้หมดอายุครับ")
             else:
                 st.warning("⚠️ ไม่พบคอลัมน์ 'วันที่ซิมหมดอายุ' ในตาราง PM_Plan ครับ")
         
-        st.markdown("<br>", unsafe_allow_html=True) # เว้นบรรทัดให้สวยงามก่อนขึ้นแผนที่
-
+        st.markdown("<br>", unsafe_allow_html=True) # เว้นบรรทัดให้สวยงาม
 # 🗺️ แผนที่
         st.markdown("### 🗺️ แผนที่พิกัดไซต์งาน (สีหมุดตามสถานะ PM)")
         if not df_master.empty and 'ละติจูด (Latitude)' in df_master.columns:
