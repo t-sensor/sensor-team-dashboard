@@ -469,7 +469,7 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                         df_sim['สถานะการใช้งาน'] = df_sim['Parsed_Date'].apply(assign_status)
                         df_sim = df_sim.sort_values(by=['Parsed_Date', 'ชื่อไซต์งาน'])
 
-df_display = df_sim[['ชื่อไซต์งาน', 'วันที่ซิมหมดอายุ', 'สถานะการใช้งาน']].copy()
+                        df_display = df_sim[['ชื่อไซต์งาน', 'วันที่ซิมหมดอายุ', 'สถานะการใช้งาน']].copy()
 
                         def highlight_sim(val):
                             if '🔴' in str(val): return 'color: #FF4B4B; font-weight: bold;'
