@@ -401,6 +401,38 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
         
         st.markdown("### 🗓️ ตารางติดตามสถานะ PM")
         st.dataframe(df_status.sort_values(by="สถานะ"), use_container_width=True, hide_index=True)
+# ==========================================
+        # 📶 ระบบแจ้งเตือนวันหมดอายุซิม (SIM Expiration)
+        # ==========================================
+        st.markdown("### 📶 ข้อมูลการเชื่อมต่อ (SIM & Network)")
+        
+        # ใช้ st.expander เพื่อทำเป็น Dropdown กดกางออกได้ (ซ่อนไว้ก่อนจะได้ไม่รก)
+        with st.expander("🔻 กดเพื่อดูตารางวันหมดอายุซิมเร้าเตอร์ (SIM Expiration)", expanded=False):
+            if 'วันที่ซิมหมดอายุ' in df_pm.columns:
+                # ดึงเฉพาะคอลัมน์ชื่อไซต์ และ วันหมดอายุ
+                df_sim = df_pm[['ชื่อไซต์งาน', 'วันที่ซิมหมดอายุ']].copy()
+                
+                # คัดกรองเอาเฉพาะแถวที่มีการกรอกข้อมูลจริง (ตัดพวกช่องว่าง หรือเครื่องหมาย - ทิ้งไป)
+                valid_sim = df_sim['วันที่ซิมหมดอายุ'].astype(str).str.strip().str.lower()
+                df_sim = df_sim[~valid_sim.isin(['nan', '', '-', 'none', 'ไม่มี'])]
+                
+                if not df_sim.empty:
+                    # 🎨 สไตล์ตารางแบบ Minimal Dark Zone (เทาเข้มตัดด้วยตัวหนังสือสีสว่าง)
+                    styled_sim = df_sim.style.set_properties(**{
+                        'background-color': '#1A1C23',  # พื้นหลังสีเทาเข้มดาร์กๆ
+                        'color': '#A6B0C3',             # ตัวอักษรสีเทาสว่าง สบายตา
+                        'border-color': '#282B36',      # สีกรอบเข้มกลืนไปกับพื้นหลัง
+                        'text-align': 'center'
+                    })
+                    
+                    # นำไปแสดงผล
+                    st.dataframe(styled_sim, use_container_width=True, hide_index=True)
+                else:
+                    st.info("✨ ยังไม่มีข้อมูลไซต์งานที่ซิมใกล้หมดอายุครับ")
+            else:
+                st.warning("⚠️ ไม่พบคอลัมน์ 'วันที่ซิมหมดอายุ' ในตาราง PM_Plan ครับ")
+        
+        st.markdown("<br>", unsafe_allow_html=True) # เว้นบรรทัดให้สวยงามก่อนขึ้นแผนที่
 
 # 🗺️ แผนที่
         st.markdown("### 🗺️ แผนที่พิกัดไซต์งาน (สีหมุดตามสถานะ PM)")
