@@ -401,8 +401,7 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
         
         st.markdown("### 🗓️ ตารางติดตามสถานะ PM")
         st.dataframe(df_status.sort_values(by="สถานะ"), use_container_width=True, hide_index=True)
-# ==========================================
-# ==========================================
+        
         # 📶 ระบบแจ้งเตือนวันหมดอายุซิม (SIM Expiration)
         # ==========================================
         st.markdown("### 📶 ข้อมูลการเชื่อมต่อ (SIM & Network)")
@@ -419,55 +418,70 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                     import re
                     today = pd.Timestamp.today().normalize()
                     
-                    # 🧠 ฟังก์ชันสมองกล: อ่านวันที่และเช็คสถานะ
+                    # 🧠 ฟังก์ชันสมองกล V.2: อ่านวันที่แบบย่อ (3/26) ได้แล้ว
                     def check_sim_status(date_str):
                         date_str = str(date_str).strip()
                         
-                        # 1. ถ้ามีคำว่า "หมด" พิมพ์มาตรงๆ ให้แดงเลย
+                        # 1. เช็คข้อมูลว่าง
+                        if not date_str or date_str.lower() in ['nan', '-', 'none', '', 'ไม่มี']:
+                            return "⚪ ไม่ระบุ/รอตรวจสอบ"
+                        
+                        # 2. ถ้ามีคำว่า "หมด" แดงทันที
                         if "หมด" in date_str or "expire" in date_str.lower():
                             return "🔴 ซิมหมดอายุแล้ว"
                             
-                        # 2. พยายามดึงตัวเลขวันที่ออกมา (รองรับทั้ง ค.ศ. และ พ.ศ.)
                         parsed_date = pd.NaT
-                        match = re.search(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', date_str)
-                        if match:
-                            d, m, y = int(match.group(1)), int(match.group(2)), int(match.group(3))
-                            if y > 2500: y -= 543  # ถ้ากรอกเป็น พ.ศ. ให้แปลงเป็น ค.ศ. ก่อนคำนวณ
-                            try:
-                                parsed_date = pd.Timestamp(year=y, month=m, day=d)
-                            except: pass
-                        else:
-                            parsed_date = pd.to_datetime(date_str, errors='coerce', dayfirst=True)
-                        
-                        # 3. นำวันที่มาเทียบกับปัจจุบัน
-                        if pd.notna(parsed_date):
+                        try:
+                            # 3. 🌟 ดักจับรูปแบบ M/YY หรือ MM/YY (เช่น 3/26, 07/26)
+                            match_short = re.search(r'^(\d{1,2})[-/](\d{2})$', date_str)
+                            
+                            if match_short:
+                                m, y = int(match_short.group(1)), int(match_short.group(2))
+                                full_year = 2000 + y
+                                next_month = m + 1 if m < 12 else 1
+                                next_year = full_year if m < 12 else full_year + 1
+                                parsed_date = pd.Timestamp(year=next_year, month=next_month, day=1) - pd.Timedelta(days=1)
+                            else:
+                                # 4. ถ้าไม่ใช่แบบย่อ ให้ลองแปลงแบบเต็ม (d/m/yyyy)
+                                match_full = re.search(r'(\d{1,2})[-/](\d{1,2})[-/](\d{4})', date_str)
+                                if match_full:
+                                    d, m, y = int(match_full.group(1)), int(match_full.group(2)), int(match_full.group(3))
+                                    if y > 2400: y -= 543
+                                    parsed_date = pd.Timestamp(year=y, month=m, day=d)
+                                else:
+                                    parsed_date = pd.to_datetime(date_str, dayfirst=True, errors='coerce')
+
+                            # 5. ประมวลผลสถานะเทียบกับปัจจุบัน
+                            if pd.isna(parsed_date):
+                                return "⚪ รูปแบบวันที่ไม่ถูกต้อง"
+                            
                             if parsed_date < today:
                                 return "🔴 ซิมหมดอายุแล้ว"
-                            elif (parsed_date - today).days <= 30:
+                            elif (parsed_date - today).days <= 60: # เตือนล่วงหน้า 60 วัน
                                 return "🟡 ใกล้หมดอายุ"
                             else:
                                 return "🟢 ใช้งานได้ปกติ"
-                        else:
-                            return "⚪ ไม่ระบุ/รอตรวจสอบ"
+                                
+                        except:
+                            return "⚪ เช็ครูปแบบวันที่"
 
                     # 🌟 สร้างคอลัมน์ใหม่ โชว์สถานะสวยๆ
                     df_sim['สถานะการใช้งาน'] = df_sim['วันที่ซิมหมดอายุ'].apply(check_sim_status)
                     
                     # 🎨 ระบบลงสีอัจฉริยะ (Minimal Dark Zone)
                     def highlight_sim(val):
-                        if '🔴' in str(val): return 'color: #FF4B4B; font-weight: bold;' # แดงสว่าง
-                        elif '🟡' in str(val): return 'color: #FFC107; font-weight: bold;' # เหลือง
-                        elif '🟢' in str(val): return 'color: #00E676;' # เขียวสว่าง
-                        return 'color: #A6B0C3;' # เทา
+                        if '🔴' in str(val): return 'color: #FF4B4B; font-weight: bold;'
+                        elif '🟡' in str(val): return 'color: #FFC107; font-weight: bold;'
+                        elif '🟢' in str(val): return 'color: #00E676;'
+                        return 'color: #A6B0C3;'
 
-                    # นำสีไปผสมกับพื้นหลังดาร์กๆ
                     styled_sim = df_sim.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
                         'background-color': '#1A1C23',  
                         'color': '#E2E8F0',             
-                        'border-color': '#282B36'
+                        'border-color': '#282B36',
+                        'text-align': 'center'
                     })
                     
-                    # แสดงผลตาราง (จัดคอลัมน์ให้อ่านง่ายขึ้น)
                     st.dataframe(styled_sim, use_container_width=True, hide_index=True)
                 else:
                     st.info("✨ ยังไม่มีข้อมูลไซต์งานที่ซิมใกล้หมดอายุครับ")
