@@ -531,8 +531,18 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
         st.markdown("### 🗺️ แผนที่พิกัดไซต์งาน (สีหมุดตามสถานะ PM)")
         if not df_master.empty and 'ละติจูด (Latitude)' in df_master.columns:
             
-            # 🌟 จุดที่แก้ไข: เติม tiles='CartoDB dark_matter' เข้าไปเพื่อเปลี่ยนเป็นธีมดำ
-            m = folium.Map(location=[13.73, 100.52], zoom_start=6, tiles='CartoDB dark_matter')
+# 🌟 ล็อกขอบเขตแผนที่ให้อยู่แค่ในประเทศไทย (ตีกรอบพิกัด)
+            m = folium.Map(
+                location=[13.73, 100.52], 
+                zoom_start=6, 
+                min_zoom=6,           # 👈 ล็อกระดับการซูมออกสุด (เลขยิ่งน้อยยิ่งซูมออก)
+                max_bounds=True,      # 👈 เปิดระบบล็อกขอบเขต
+                min_lat=5.0,          # พิกัดใต้สุดของไทย
+                max_lat=21.0,         # พิกัดเหนือสุดของไทย
+                min_lon=97.0,         # พิกัดตะวันตกสุดของไทย
+                max_lon=106.0,        # พิกัดตะวันออกสุดของไทย
+                tiles='CartoDB dark_matter'
+            )
             
             for _, r in df_master.dropna(subset=['ละติจูด (Latitude)', 'ลองจิจูด (Longitude)']).iterrows():
                 s_name = str(r['ชื่อไซต์งาน (Process Work)']).strip()
