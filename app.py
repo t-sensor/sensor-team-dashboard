@@ -395,12 +395,13 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
             else:
                 st.info("ไม่มีข้อมูลใน Master_Site")
 
-        # ตารางสถานะที่กรองแล้ว
+# ตารางสถานะที่กรองแล้ว
         if filter_choice != "แสดงทั้งหมด":
             df_status = df_status[df_status['สถานะ'] == filter_choice]
         
         st.markdown("### 🗓️ ตารางติดตามสถานะ PM")
-        st.dataframe(df_status.sort_values(by="สถานะ"), use_container_width=True, hide_index=True)
+        with st.expander("🔻 กดเพื่อดูตารางติดตามสถานะ PM", expanded=False):
+            st.dataframe(df_status.sort_values(by="สถานะ"), use_container_width=True, hide_index=True)
         
 # ==========================================
         # 📶 ระบบแจ้งเตือนวันหมดอายุซิม (SIM Expiration)
