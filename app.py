@@ -416,69 +416,64 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                     import re
                     today = pd.Timestamp.today().normalize()
                     
-                    # 🧠 ฟังก์ชันสมองกล V.4: จับคำว่า "หมดอายุ" ก่อนแปลงวันที่
-                    def check_sim_status(date_str):
-                        date_str = str(date_str).strip()
+                    # 🧠 ฟังก์ชันสมองกล V.5: แปลงวันที่เพื่อนำไป "เรียงลำดับเวลา"
+                    def get_sortable_date(date_str):
+                        date_str = str(date_str).strip().lower()
+                        # 1. เช็คช่องว่าง หรือขีด (-) ให้ไปอยู่ล่างสุด
+                        if not date_str or date_str in ['nan', '-', 'none', '', 'ไม่มี']:
+                            return pd.Timestamp('2099-12-31') 
                         
-                        # 1. เช็คข้อมูลว่าง
-                        if not date_str or date_str.lower() in ['nan', '-', 'none', '', 'ไม่มี']:
-                            return "⚪ ไม่ระบุ/รอตรวจสอบ"
-                        
-                        # 2. 🌟 ดักจับคำว่า "หมด" เป็นอันดับแรกสุด ป้องกัน Error
-                        if "หมด" in date_str or "expire" in date_str.lower():
-                            return "🔴 ซิมหมดอายุแล้ว"
+                        # 2. ถ้าเจอคำว่าหมด ให้เด้งไปบนสุด
+                        if "หมด" in date_str or "expire" in date_str:
+                            return pd.Timestamp('1999-01-01') 
                             
-                        parsed_date = pd.NaT
                         try:
                             # 3. ดักจับ d/m/yyyy
                             match_full = re.search(r'^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$', date_str)
                             if match_full:
                                 d, m, y = int(match_full.group(1)), int(match_full.group(2)), int(match_full.group(3))
                                 if y > 2400: y -= 543
-                                parsed_date = pd.Timestamp(year=y, month=m, day=d)
-                            else:
-                                # 4. ดักจับ m/yy หรือ m/yyyy (เช่น 3/26)
-                                match_short = re.search(r'^(\d{1,2})[-/](\d{2}|\d{4})$', date_str)
-                                if match_short:
-                                    m, y = int(match_short.group(1)), int(match_short.group(2))
-                                    if y < 100: y += 2000 
-                                    elif y > 2400: y -= 543 
-                                    
-                                    next_month = m + 1 if m < 12 else 1
-                                    next_year = y if m < 12 else y + 1
-                                    parsed_date = pd.Timestamp(year=next_year, month=next_month, day=1) - pd.Timedelta(days=1)
-                                else:
-                                    parsed_date = pd.to_datetime(date_str, dayfirst=True, errors='coerce')
+                                return pd.Timestamp(year=y, month=m, day=d)
+                                
+                            # 4. ดักจับ m/yy หรือ m/yyyy (เช่น 3/26)
+                            match_short = re.search(r'^(\d{1,2})[-/](\d{2}|\d{4})$', date_str)
+                            if match_short:
+                                m, y = int(match_short.group(1)), int(match_short.group(2))
+                                if y < 100: y += 2000 
+                                elif y > 2400: y -= 543 
+                                next_month = m + 1 if m < 12 else 1
+                                next_year = y if m < 12 else y + 1
+                                return pd.Timestamp(year=next_year, month=next_month, day=1) - pd.Timedelta(days=1)
+                                
+                            # 5. ถ้าพิมพ์รูปแบบแปลกๆ มา ให้ Pandas ลองแกะ ถ้าไม่ได้ให้เด้งไปบนสุด!
+                            parsed = pd.to_datetime(date_str, dayfirst=True, errors='coerce')
+                            if pd.notna(parsed): return parsed
+                            return pd.Timestamp('1999-01-02') 
+                        except:
+                            return pd.Timestamp('1999-01-02')
 
-                            if pd.isna(parsed_date):
-                                return "⚪ รูปแบบวันที่ไม่ถูกต้อง"
-                            
-                            # 5. เทียบวันที่กับปัจจุบัน
-                            if parsed_date < today:
+                    df_sim['Parsed_Date'] = df_sim['วันที่ซิมหมดอายุ'].apply(get_sortable_date)
+                    
+                    # 🌟 ตัดเฉพาะไซต์ที่ "ว่างเปล่าจริงๆ" ออกไป
+                    df_sim = df_sim[df_sim['Parsed_Date'] != pd.Timestamp('2099-12-31')]
+                    
+                    if not df_sim.empty:
+                        # 🌟 สร้างสถานะจากวันที่ ที่ถูกแปลงมา
+                        def assign_status(d):
+                            if d.year == 1999 or d < today:
                                 return "🔴 ซิมหมดอายุแล้ว"
-                            elif (parsed_date - today).days <= 60:
+                            elif (d - today).days <= 60:
                                 return "🟡 ใกล้หมดอายุ"
                             else:
                                 return "🟢 ใช้งานได้ปกติ"
-                                
-                        except:
-                            return "⚪ เช็ครูปแบบวันที่"
 
-                    # 🌟 ประมวลผลสถานะทั้งหมด
-                    df_sim['สถานะการใช้งาน'] = df_sim['วันที่ซิมหมดอายุ'].apply(check_sim_status)
-                    
-                    # 🌟 ตัดไซต์ที่ยังไม่ได้กรอกข้อมูลออก
-                    df_sim = df_sim[~df_sim['สถานะการใช้งาน'].isin(["⚪ ไม่ระบุ/รอตรวจสอบ", "⚪ รูปแบบวันที่ไม่ถูกต้อง", "⚪ เช็ครูปแบบวันที่"])]
-                    
-                    if not df_sim.empty:
-                        # 🌟 จัดเรียงลำดับ: แดง(1) -> เหลือง(2) -> เขียว(3)
-                        sort_mapping = {
-                            "🔴 ซิมหมดอายุแล้ว": 1,
-                            "🟡 ใกล้หมดอายุ": 2,
-                            "🟢 ใช้งานได้ปกติ": 3
-                        }
-                        df_sim['ลำดับ'] = df_sim['สถานะการใช้งาน'].map(lambda x: sort_mapping.get(x, 4))
-                        df_sim = df_sim.sort_values(by=['ลำดับ', 'ชื่อไซต์งาน']).drop(columns=['ลำดับ'])
+                        df_sim['สถานะการใช้งาน'] = df_sim['Parsed_Date'].apply(assign_status)
+                        
+                        # 🌟 เรียงลำดับตามวันที่เลย (เก่าสุด -> ไปหา -> อนาคต)
+                        df_sim = df_sim.sort_values(by=['Parsed_Date', 'ชื่อไซต์งาน'])
+
+                        # ตัดคอลัมน์ซ่อนทิ้ง เตรียมแสดงผล
+                        df_display = df_sim[['ชื่อไซต์งาน', 'วันที่ซิมหมดอายุ', 'สถานะการใช้งาน']].copy()
 
                         # 🎨 ระบบลงสีอัจฉริยะ (Minimal Dark Zone)
                         def highlight_sim(val):
@@ -487,17 +482,20 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                             elif '🟢' in str(val): return 'color: #00E676;'
                             return 'color: #A6B0C3;'
 
-                        styled_sim = df_sim.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
+                        styled_sim = df_display.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
                             'background-color': '#1A1C23',  
                             'color': '#E2E8F0',             
                             'border-color': '#282B36',
                             'text-align': 'center'
                         })
                         
-                        # 🌟 จุดที่อัปเกรด: บีบตารางให้แคบลงและอยู่ตรงกลาง (อัตราส่วน 1 : 3 : 1)
+                        # 🌟 คำนวณความสูงตารางอัตโนมัติ (กางเต็มร้อยเปอร์เซ็นต์ ไม่ต้องไถแถบเลื่อนด้านใน)
+                        dynamic_height = int(len(df_display) * 35.5) + 42
+                        
+                        # จัดเลย์เอาต์บีบตารางให้อยู่กึ่งกลาง
                         col_space1, col_table, col_space3 = st.columns([1, 3, 1])
                         with col_table:
-                            st.dataframe(styled_sim, use_container_width=True, hide_index=True)
+                            st.dataframe(styled_sim, use_container_width=True, hide_index=True, height=dynamic_height)
                             
                     else:
                         st.info("✨ ยังไม่มีข้อมูลไซต์งานที่ต้องแจ้งเตือนซิมครับ")
