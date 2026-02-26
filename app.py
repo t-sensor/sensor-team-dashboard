@@ -469,7 +469,7 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                         df_sim['สถานะการใช้งาน'] = df_sim['Parsed_Date'].apply(assign_status)
                         df_sim = df_sim.sort_values(by=['Parsed_Date', 'ชื่อไซต์งาน'])
 
-                        df_display = df_sim[['ชื่อไซต์งาน', 'วันที่ซิมหมดอายุ', 'สถานะการใช้งาน']].copy()
+df_display = df_sim[['ชื่อไซต์งาน', 'วันที่ซิมหมดอายุ', 'สถานะการใช้งาน']].copy()
 
                         def highlight_sim(val):
                             if '🔴' in str(val): return 'color: #FF4B4B; font-weight: bold;'
@@ -477,17 +477,46 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                             elif '🟢' in str(val): return 'color: #00E676;'
                             return 'color: #A6B0C3;'
 
-                        styled_sim = df_display.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
-                            'background-color': '#1A1C23',  
-                            'color': '#E2E8F0',             
-                            'border-color': '#282B36',
-                            'text-align': 'center'
-                        })
+                        # 🌟 อัปเกรด V.7: หั่นตารางเป็น 2 ฝั่ง (ซ้าย-ขวา) ถ้าข้อมูลเยอะเกินไป จะได้แคปจอเดียวจบ!
+                        total_rows = len(df_display)
                         
-                        dynamic_height = int(len(df_display) * 35.5) + 42
-                        col_space1, col_table, col_space3 = st.columns([1, 3, 1])
-                        with col_table:
-                            st.dataframe(styled_sim, use_container_width=True, hide_index=True, height=dynamic_height)
+                        if total_rows > 12: # ถ้ามีเกิน 12 ไซต์ ให้แบ่ง 2 แถว
+                            mid_idx = (total_rows + 1) // 2
+                            df_left = df_display.iloc[:mid_idx]
+                            df_right = df_display.iloc[mid_idx:]
+                            
+                            # สร้างพื้นที่ 2 ฝั่ง
+                            col_left, col_right = st.columns(2)
+                            
+                            style_props = {
+                                'background-color': '#1A1C23', 
+                                'color': '#E2E8F0', 
+                                'border-color': '#282B36', 
+                                'text-align': 'center'
+                            }
+                            
+                            styled_left = df_left.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**style_props)
+                            styled_right = df_right.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**style_props)
+                            
+                            # คำนวณความสูงจากฝั่งซ้าย (เพราะยาวกว่าหรือเท่ากันเสมอ)
+                            dynamic_height = int(len(df_left) * 35.5) + 42
+                            
+                            with col_left:
+                                st.dataframe(styled_left, use_container_width=True, hide_index=True, height=dynamic_height)
+                            with col_right:
+                                st.dataframe(styled_right, use_container_width=True, hide_index=True, height=dynamic_height)
+                        else:
+                            # ถ้าไซต์ยังน้อย (ไม่เกิน 12) ให้แสดงคอลัมน์เดียวตรงกลางเหมือนเดิม
+                            styled_sim = df_display.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
+                                'background-color': '#1A1C23',  
+                                'color': '#E2E8F0',             
+                                'border-color': '#282B36',
+                                'text-align': 'center'
+                            })
+                            dynamic_height = int(len(df_display) * 35.5) + 42
+                            col_space1, col_table, col_space3 = st.columns([1, 3, 1])
+                            with col_table:
+                                st.dataframe(styled_sim, use_container_width=True, hide_index=True, height=dynamic_height)
                             
                     else:
                         st.info("✨ ยังไม่มีข้อมูลไซต์งานที่ต้องแจ้งเตือนซิมครับ")
