@@ -496,8 +496,8 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                                 'text-align': 'center'
                             }
                             
-                            styled_left = df_left.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**style_props)
-                            styled_right = df_right.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**style_props)
+                            styled_left = df_left.style.map(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**style_props)
+                            styled_right = df_right.style.map(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**style_props)
                             
                             # คำนวณความสูงจากฝั่งซ้าย (เพราะยาวกว่าหรือเท่ากันเสมอ)
                             dynamic_height = int(len(df_left) * 35.5) + 42
@@ -508,7 +508,7 @@ if menu == "🏠 1. ภาพรวมและสถิติ (Dashboard)":
                                 st.dataframe(styled_right, use_container_width=True, hide_index=True, height=dynamic_height)
                         else:
                             # ถ้าไซต์ยังน้อย (ไม่เกิน 12) ให้แสดงคอลัมน์เดียวตรงกลางเหมือนเดิม
-                            styled_sim = df_display.style.applymap(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
+                            styled_sim = df_display.style.map(highlight_sim, subset=['สถานะการใช้งาน']).set_properties(**{
                                 'background-color': '#1A1C23',  
                                 'color': '#E2E8F0',             
                                 'border-color': '#282B36',
@@ -745,7 +745,7 @@ elif menu == "📱 3. กระดานงานส่วนตัว (My Workl
                 return f'color: {color}'
             
             # โชว์ตารางงานทั้งหมดของฉัน (ที่รวบประวัติซ้ำๆ ออกไปแล้ว)
-            st.dataframe(my_all_tasks[available_cols].style.applymap(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
+            st.dataframe(my_all_tasks[available_cols].style.map(highlight_status, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
         else:
             st.success("🎉 ตอนนี้คุณไม่มีงานค้างเลยครับ พักผ่อนได้!")
     else:
@@ -1045,7 +1045,7 @@ elif menu == "📊 4. ภาพรวมงานของทีม (Team Manage
                 return f'color: {color}'
             
             # แสดงตารางผลลัพธ์
-            st.dataframe(filtered_df[available_cols].style.applymap(highlight_status_m4, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
+            st.dataframe(filtered_df[available_cols].style.map(highlight_status_m4, subset=['สถานะงาน']), use_container_width=True, hide_index=True)
             
         else:
             st.info("ยังไม่มีข้อมูลงานในระบบครับ")
@@ -1537,7 +1537,7 @@ elif menu == "📅 9. แผนงานล่วงหน้า (Planned Tasks)
                 return ''
             
             # แสดงตาราง
-            st.dataframe(df_plan.style.applymap(highlight_plan_status, subset=['สถานะ']), use_container_width=True, hide_index=True)
+            st.dataframe(df_plan.style.map(highlight_plan_status, subset=['สถานะ']), use_container_width=True, hide_index=True)
             
         else:
             st.info("ยังไม่มีข้อมูลแผนงานล่วงหน้าในระบบครับ (เริ่มกดเพิ่มแผนงานด้านบนได้เลย)")
